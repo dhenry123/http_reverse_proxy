@@ -1,0 +1,41 @@
+frontends:
+  - name: "frontend-https"
+    protocol: "http"
+    port: 8443
+    addr: "0.0.0.0"
+    tls: true
+    active: true
+    acls:
+      - name: "host_www"
+        host: "www.domain.com"
+        backend: "k8s_www"
+        antibot: true
+  - name: "frontend-http"
+    protocol: "http"
+    addr: "0.0.0.0"
+    port: 3000
+    tls: false
+    active: true
+    acls:
+      - name: "host_www"
+        host: "www.domain.com"
+        backend: "k8s_www"
+        antibot: true
+pool_backends:
+  - name: "k8s_www"
+    servers:
+      - "k8snode0-www"
+      - "k8snode1-www"
+pool_servers:
+  - name: "k8snode0-www"
+    host: "172.0.0.11"
+    port: 31222
+    protocol: "http"
+    tls: false
+    active: true
+  - name: "k8snode1-www"
+    host: "172.0.0.10"
+    port: 31222
+    protocol: "http"
+    tls: false
+    active: false

@@ -1,0 +1,22 @@
+- [x] créer une configuration yaml
+- [ ] hotreload de la configuration
+- [ ] sauvegarder la configuration runtime
+- [ ] Listener REST API
+- [ ] Listener http
+  - [ ] - ws upgrader
+- [ ] Listener https
+  - [ ] - wss upgrader
+- [ ] Forwarder
+  - [ ] https
+  - [ ] http
+  - [ ] ws
+  - [ ] wss
+- [ ] Forwarder Roundrobin rotation
+  - [ ] http|https
+  - [ ] ws|wss
+- [ ] Forwarder weighted rotation
+- [ ] runtime
+  - [ ] change server configuration (update) + health checks + sauvegarder la configuration
+- [ ] health checks
+- [ ] implémenter un contrôle anti-bot genre Anubis
+- [ ] hotreload des certificats si possible ??? humm compliqué

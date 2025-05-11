@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "cargo",
+      "command": "build",
+      "problemMatcher": ["$rustc"],
+      "group": "build",
+      "label": "rust: cargo build"
+    },
+    {
+      "type": "cargo",
+      "command": "clean",
+      "problemMatcher": ["$rustc"],
+      "group": "build",
+      "label": "rust: cargo clean"
+    },
+    {
+      "label": "Run with cargo watch",
+      "type": "shell",
+      "command": "cargo",
+      "args": [
+        "watch",
+        "-w",
+        "./src",
+        "-x",
+        "run -- -c ~/git/http_reverse_proxy/config.yaml -t ~/git/http_reverse_proxy/certs"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$rustc"],
+      "detail": "cargo watch"
+    },
+    {
+      "type": "cargo",
+      "command": "build",
+      "args": ["--release"],
+      "label": "rust: cargo build --release"
+    },
+    {
+      "type": "shell",
+      "command": "target/release/http_reverse_proxy",
+      "label": "run release"
+    }
+  ]
+}

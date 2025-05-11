@@ -1,0 +1,40 @@
+[package]
+name = "http_reverse_proxy"
+authors = ["Damien henry for mytinydc.com"]
+version = "0.1.0"
+edition = "2024"
+
+[profile.dev]
+opt-level = 0  # Debug (slow runtime)
+
+[profile.release]
+opt-level = 3  # Release (fast runtime)
+
+[dependencies]
+hyper = { version = "1.6.0", features = ["full"] }
+hyper-tls = "0"
+http-body-util = "0.1"
+hyper-util = { version = "0.1", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+futures = "0.3.31"
+bytes = "1"
+## Config
+arc-swap = "1.7.1"
+## TLS
+rustls = { version = "0.23.26" }
+tokio-rustls = "0"
+rustls-pemfile = "2.2.0"
+## Websockets
+tokio-tungstenite = { version = "0.26.2", features = ["native-tls"] }
+futures-util = "0.3"
+sha1 = "0.10"
+base64 = "0.22"
+## Configuration
+serde_yaml = "0.9"
+tempfile = "3.19"
+## antibot
+uuid = { version = "1.16.0", features = ["v4", "std"] }
+## config
+clap = { version = "4.0", features = ["derive"] }
