@@ -33,7 +33,7 @@ sha1 = "0.10"
 base64 = "0.22"
 ## Configuration
 serde_yaml = "0.9"
-tempfile = "3.19"
+tempfile = "3"
 ## antibot
 uuid = { version = "1.16.0", features = ["v4", "std"] }
 ## config
