@@ -23,10 +23,18 @@ impl ServerTracker {
     }
 
     pub fn get_next_backend(&self, host: &str) -> Option<BackendServer> {
-        self.backends.get(host).map(|(servers, idx)| {
+        // Get natural next backend
+        let final_server = self.backends.get(host).map(|(servers, idx)| {
             let next_idx = idx.fetch_add(1, Ordering::Relaxed);
-            servers[next_idx % servers.len()].clone()
-        })
+            let server = servers[next_idx % servers.len()].clone();
+            server
+        });
+        // if server, check is active?
+        if final_server.is_some() && !final_server.clone().unwrap().active {
+            None
+        } else {
+            final_server
+        }
     }
 
     // pub fn get_first_backend(&self, host: &str) -> Option<BackendServer> {
