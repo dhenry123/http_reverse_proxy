@@ -11,8 +11,12 @@ pub const HTTP_HEADER_X_FORWARDED_FOR: &str = "X-Forwarded-For";
 pub const HTTP_HEADER_X_REAL_IP: &str = "X-Real-IP";
 
 //internal ports
-pub const HTTP_INTERNAL_ERROR_PORT: u16 = 2201;
-pub const HTTP_INTERNAL_ANTIBOT_PORT: u16 = 2202;
+pub const HTTP_INTERNAL_SERVER: u16 = 2201;
 
 // antibot
 pub const ANTIBOT_COOKIE_NAME: &str = "antibot";
+pub const ANTIBOT_INTERNAL_ROUTE: &str = "_internal_server/antibot";
+
+// internal errors
+pub const INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE: &str =
+    "_internal_server/no_backend_server_available";

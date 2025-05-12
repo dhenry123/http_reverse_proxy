@@ -10,7 +10,10 @@ use hyper_util::client::legacy::{Client, connect::HttpConnector};
 use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
-    constants::{HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP},
+    constants::{
+        ANTIBOT_INTERNAL_ROUTE, HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP,
+        INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE,
+    },
     forwarders::forwarder_helper::{CookieJar, get_upstream_uri, is_domain_configured_for_antibot},
     structs::ProxyConfig,
 };
@@ -116,32 +119,27 @@ pub async fn handle_request(
     // upstream uri
     let mut upstream_uri = get_upstream_uri(original_host.clone(), servers_tracker.clone());
     if upstream_uri == "" {
-        upstream_uri = "http://127.0.0.1:2201".to_string();
+        // Internal server - No server available
+        upstream_uri = format!(
+            "http://127.0.0.1:2201/{}{}",
+            INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE,
+            parts.uri.to_string()
+        );
     } else {
         // antibot for this host ?
         if is_antibot_protected {
             let cookies_list = parts.headers.get("cookie");
-            // No cookie return antibot service
             if cookies_list.is_none() {
-                //println!("antibot cookie not detected");
-                upstream_uri = format!(
-                    "http://127.0.0.1:2202{}{}",
-                    parts.uri.path(),
-                    parts
-                        .uri
-                        .query()
-                        .map(|q| format!("?{}", q))
-                        .unwrap_or_default()
-                );
+                // No cookie go to antibot
+                upstream_uri = format!("http://127.0.0.1:2201/{}", ANTIBOT_INTERNAL_ROUTE,);
             } else {
-                //println!("cookie detected: {:?}", cookies_list);
+                // extract cookie(s)
                 let jar = CookieJar::from_header(cookies_list.unwrap().to_str().unwrap());
-                // cookie not detected ?
+                // is antibot cookie detected ?
                 let antibot_cookie_value = jar.get_value("antibot");
-                // naive condition
                 if antibot_cookie_value.is_none() {
-                    //println!("antibot cookie not detected");
-                    upstream_uri = "http://127.0.0.1:2201".to_string();
+                    // not detected go to antibot
+                    upstream_uri = format!("http://127.0.0.1:2201/{}", ANTIBOT_INTERNAL_ROUTE,);
                 }
             }
         }
