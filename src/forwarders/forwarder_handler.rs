@@ -11,14 +11,14 @@ use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
     constants::{
-        ANTIBOT_INTERNAL_ROUTE, HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP,
-        INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE,
+        HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP, HTTP_INTERNAL_SERVER,
+        INTERNAL_ROUTE_ANTIBOT, INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
     },
-    forwarders::forwarder_helper::{CookieJar, get_upstream_uri, is_domain_configured_for_antibot},
+    forwarders::forwarder_helper::{get_upstream_uri, is_domain_configured_for_antibot},
     structs::ProxyConfig,
 };
 
-use super::servers_tracker::ServerTracker;
+use super::{forwarder_helper::is_cookie_antibot, servers_tracker::ServerTracker};
 
 /**
  * Alter output header client->listener (Response)
@@ -121,38 +121,22 @@ pub async fn handle_request(
     if upstream_uri == "" {
         // Internal server - No server available
         upstream_uri = format!(
-            "http://127.0.0.1:2201/{}{}",
-            INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE,
+            "http://127.0.0.1:{}/{}{}",
+            HTTP_INTERNAL_SERVER,
+            INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
             parts.uri.to_string()
         );
     } else {
         // antibot for this host ?
         if is_antibot_protected {
-            let cookies_list = parts.headers.get("cookie");
-            if cookies_list.is_none() {
-                // No cookie go to antibot
-                upstream_uri = format!("http://127.0.0.1:2201/{}", ANTIBOT_INTERNAL_ROUTE,);
-            } else {
-                // extract cookie(s)
-                let jar = CookieJar::from_header(cookies_list.unwrap().to_str().unwrap());
-                // is antibot cookie detected ?
-                let antibot_cookie_value = jar.get_value("antibot");
-                if antibot_cookie_value.is_none() {
-                    // not detected go to antibot
-                    upstream_uri = format!("http://127.0.0.1:2201/{}", ANTIBOT_INTERNAL_ROUTE,);
-                }
+            if !is_cookie_antibot(parts.headers.get("cookie")) {
+                upstream_uri = format!(
+                    "http://127.0.0.1:{}/{}",
+                    HTTP_INTERNAL_SERVER, INTERNAL_ROUTE_ANTIBOT,
+                );
             }
         }
-        upstream_uri = format!(
-            "{}{}{}",
-            upstream_uri,
-            parts.uri.path(),
-            parts
-                .uri
-                .query()
-                .map(|q| format!("?{}", q))
-                .unwrap_or_default()
-        );
+        upstream_uri = format!("{}{}", upstream_uri, parts.uri.to_string());
     }
     let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
     //====> To check round robin load balance

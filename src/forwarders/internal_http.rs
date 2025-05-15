@@ -1,23 +1,21 @@
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{
-    Request, Response, StatusCode, header::HeaderValue, server::conn::http1, service::service_fn,
+    Method, Request, Response, StatusCode, header::HeaderValue, server::conn::http1,
+    service::service_fn,
 };
-
 use hyper_util::rt::{TokioIo, TokioTimer};
 use std::{convert::Infallible, net::SocketAddr};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::http;
-use uuid::Uuid;
 
 use crate::{
-    constants::{
-        ANTIBOT_COOKIE_NAME, ANTIBOT_INTERNAL_ROUTE,
-        INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE,
-    },
+    constants::{INTERNAL_ROUTE_ANTIBOT, INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE},
     html::{template_html_antibot, template_html_internal_error},
     structs::GenericError,
 };
+
+use super::forwarder_helper::get_cookie_antibot;
 
 enum InternalServerErrors {
     ServerUnavailable,
@@ -42,14 +40,9 @@ async fn internal_error(
             p1 = "Our servers are temporarily unavailable due to high traffic or maintenance. Please try again later.".to_string();
             p2 = "If the problem persists, contact <a href='mailto:support@example.com'>support@example.com</a>.".to_string();
         }
-        _ => {
-            error_code = "".to_string();
-            p1 = "".to_string();
-            p2 = "".to_string();
-        }
     }
     let final_path = parts.uri.to_string().replace(
-        format!("/{}", INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE).as_str(),
+        format!("/{}", INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE).as_str(),
         "",
     );
     let html = template_html_internal_error(error_code, p1, p2, final_path);
@@ -66,21 +59,22 @@ async fn antibot(parts: http::request::Parts) -> Result<Response<Full<Bytes>>, I
     let final_path = parts
         .uri
         .to_string()
-        .replace(format!("/{}", ANTIBOT_INTERNAL_ROUTE).as_str(), "");
+        .replace(format!("/{}", INTERNAL_ROUTE_ANTIBOT).as_str(), "");
     //println!("finale path: {}", final_path);
     let html = template_html_antibot(final_path);
     let body = Full::new(Bytes::from(html));
     let mut response = Response::new(body);
     // Change http code
     *response.status_mut() = StatusCode::SERVICE_UNAVAILABLE;
-    // Set Antibot cookie (basic To improve @todo)
-    response.headers_mut().append(
-        "Set-Cookie",
-        HeaderValue::from_str(
-            format!("{}={}; Path=/", ANTIBOT_COOKIE_NAME, Uuid::new_v4()).as_str(),
-        )
-        .unwrap(),
-    );
+
+    let host = parts.headers.get("host");
+    if host.is_some() {
+        let cookie = get_cookie_antibot(host.unwrap().to_str().unwrap().to_string());
+        response.headers_mut().append(
+            "Set-Cookie",
+            HeaderValue::from_str(cookie.to_string().as_str()).unwrap(),
+        );
+    }
     Ok(response)
 }
 
@@ -89,25 +83,23 @@ async fn backend_service(
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     let (parts, _body) = req.into_parts();
     //println!("route : {:?}", parts.uri);
-    if parts
-        .uri
-        .to_string()
-        .matches(format!("/{}", INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE,).as_str())
-        .count()
-        > 0
-    {
-        Ok(internal_error(InternalServerErrors::ServerUnavailable, parts).await?)
-    } else if parts
-        .uri
-        .to_string()
-        .matches(format!("/{}", ANTIBOT_INTERNAL_ROUTE).as_str())
-        .count()
-        > 0
-    {
-        //println!("[*] match antibot");
-        Ok(antibot(parts).await?)
-    } else {
-        Ok(internal_error(InternalServerErrors::RouteNotFound, parts).await?)
+    match (parts.clone().method, parts.uri.path()) {
+        // Server unavailable
+        (Method::GET, path)
+            if path.starts_with(
+                format!("/{}", INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,).as_str(),
+            ) =>
+        {
+            Ok(internal_error(InternalServerErrors::ServerUnavailable, parts).await?)
+        }
+        // Antibot
+        (Method::GET, path)
+            if path.starts_with(format!("/{}", INTERNAL_ROUTE_ANTIBOT,).as_str()) =>
+        {
+            Ok(antibot(parts).await?)
+        }
+        // else
+        _ => Ok(internal_error(InternalServerErrors::RouteNotFound, parts).await?),
     }
 }
 

@@ -15,8 +15,10 @@ pub const HTTP_INTERNAL_SERVER: u16 = 2201;
 
 // antibot
 pub const ANTIBOT_COOKIE_NAME: &str = "antibot";
-pub const ANTIBOT_INTERNAL_ROUTE: &str = "_internal_server/antibot";
 
-// internal errors
-pub const INTERNAL_ERROR_ROUTE_NO_BACKEND_SERVER_AVAILABLE: &str =
+// Routes
+//--> antibot
+pub const INTERNAL_ROUTE_ANTIBOT: &str = "_internal_server/antibot";
+//--> internal errors
+pub const INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE: &str =
     "_internal_server/no_backend_server_available";
