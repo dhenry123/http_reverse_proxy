@@ -22,3 +22,7 @@ pub const INTERNAL_ROUTE_ANTIBOT: &str = "_internal_server/antibot";
 //--> internal errors
 pub const INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE: &str =
     "_internal_server/no_backend_server_available";
+
+// Websocket
+pub const INTERNAL_ROUTE_MAKE_WEBSOCKET: &str = "_internal_server/websocket";
+pub const SECRET_WS_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";

@@ -10,7 +10,10 @@ use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::http;
 
 use crate::{
-    constants::{INTERNAL_ROUTE_ANTIBOT, INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE},
+    constants::{
+        INTERNAL_ROUTE_ANTIBOT, INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
+        INTERNAL_ROUTE_MAKE_WEBSOCKET,
+    },
     html::{template_html_antibot, template_html_internal_error},
     structs::GenericError,
 };
@@ -78,6 +81,26 @@ async fn antibot(parts: http::request::Parts) -> Result<Response<Full<Bytes>>, I
     Ok(response)
 }
 
+pub async fn ws_upgrade_reponse(accept: String) -> Result<Response<Full<Bytes>>, Infallible> {
+    let body = Full::new(Bytes::from("".to_string()));
+    let mut response = Response::new(body);
+    // Change http code
+    *response.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
+    // Upgrade
+    response
+        .headers_mut()
+        .append("Upgrade", HeaderValue::from_str("websocket").unwrap());
+    response
+        .headers_mut()
+        .append("Connection", HeaderValue::from_str("upgrade").unwrap());
+    response.headers_mut().append(
+        "Sec-WebSocket-Accept",
+        HeaderValue::from_str(accept.as_str()).unwrap(),
+    );
+
+    Ok(response)
+}
+
 async fn backend_service(
     req: Request<impl hyper::body::Body>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
@@ -97,6 +120,13 @@ async fn backend_service(
             if path.starts_with(format!("/{}", INTERNAL_ROUTE_ANTIBOT,).as_str()) =>
         {
             Ok(antibot(parts).await?)
+        }
+        // Create web socket Response
+        (Method::GET, path)
+            if path.starts_with(format!("/{}", INTERNAL_ROUTE_MAKE_WEBSOCKET,).as_str()) =>
+        {
+            let token = path.replace(format!("/{}/", INTERNAL_ROUTE_MAKE_WEBSOCKET).as_str(), "");
+            Ok(ws_upgrade_reponse(token).await?)
         }
         // else
         _ => Ok(internal_error(InternalServerErrors::RouteNotFound, parts).await?),
@@ -122,13 +152,13 @@ pub async fn internal_http(name: String, addr: SocketAddr) -> Result<(), Generic
                         .serve_connection(io, service_fn(backend_service))
                         .await
                     {
-                        eprintln!("[ERROR] Error serving connection: {:?}", err);
+                        eprintln!("[internal listener error] {:?}", err);
                     }
                 });
             }
             Err(e) => {
                 // Only log persistent errors
-                eprintln!("[ACCEPT ERROR] {:?}", e);
+                eprintln!("[internal listener ACCEPT ERROR] {:?}", e);
             }
         }
     }

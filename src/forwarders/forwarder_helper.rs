@@ -1,7 +1,7 @@
 use std::{collections::HashMap, error::Error, fs, path::PathBuf, sync::Arc, time::Duration};
 
 use arc_swap::{ArcSwap, ArcSwapAny};
-use hyper::{body, header::HeaderValue};
+use hyper::{Request, body, header::HeaderValue};
 use hyper_tls::HttpsConnector;
 use hyper_util::{
     client::legacy::{Client, connect::HttpConnector},
@@ -10,6 +10,7 @@ use hyper_util::{
 use rustls::{ServerConfig, crypto::aws_lc_rs::sign::any_supported_type, sign::CertifiedKey};
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use uuid::Uuid;
 
 use crate::{
     constants::{ANTIBOT_COOKIE_NAME, POOL_IDLE_TIMEOUT, POOL_MAX_IDLE_PER_HOST},
@@ -165,6 +166,7 @@ pub fn get_http_client() -> Client<hyper_tls::HttpsConnector<HttpConnector>, bod
 pub fn get_upstream_uri(
     original_host: String,
     servers_tracker: Arc<ArcSwapAny<Arc<ServerTracker>>>,
+    is_web_socket: bool,
 ) -> String {
     // Which backend ?
     let backend_server = servers_tracker
@@ -173,7 +175,7 @@ pub fn get_upstream_uri(
         .get_next_backend(&original_host);
     //println!("backend_server: {:?}", backend_server);
     if backend_server.is_some() {
-        build_upstream_uri(backend_server.unwrap(), false)
+        build_upstream_uri(backend_server.unwrap(), is_web_socket)
     } else {
         "".to_string()
     }
@@ -215,13 +217,13 @@ pub fn is_domain_configured_for_antibot(
  * Simple cookie...
  */
 pub fn get_cookie_antibot(host: String) -> Cookie<'static> {
-    let cookie = Cookie::build((ANTIBOT_COOKIE_NAME, ""))
+    let cookie = Cookie::build((ANTIBOT_COOKIE_NAME, Uuid::new_v4().to_string()))
         .domain(host)
         .path("/")
         .secure(false)
         .http_only(true)
         .same_site(cookie::SameSite::Strict)
-        .max_age(cookie::time::Duration::minutes(10))
+        .max_age(cookie::time::Duration::hours(2))
         .build();
     return cookie;
 }
@@ -239,4 +241,13 @@ pub fn is_cookie_antibot(cookie_http_header: Option<&HeaderValue>) -> bool {
         }
         return false;
     }
+}
+
+// Helper function to check WebSocket request
+pub fn is_websocket_request(req: &Request<hyper::body::Incoming>) -> bool {
+    req.headers()
+        .get("Upgrade")
+        .and_then(|h| h.to_str().ok())
+        .map(|h| h.eq_ignore_ascii_case("websocket"))
+        .unwrap_or(false)
 }

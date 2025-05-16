@@ -75,7 +75,7 @@ pub async fn proxy_from_https(
                 let start = Instant::now();
                 let tls_acceptor = tls_acceptor.clone();
                 // connection accepted - let's check tls and continue if ok
-                let name = frontend_name.clone();
+                let frontend_name = frontend_name.clone();
                 match tls_acceptor.accept(tcp).await {
                     Ok(tls_stream) => {
                         //println!("TLS handshake succeeded in {:?}", start.elapsed());
@@ -93,8 +93,8 @@ pub async fn proxy_from_https(
                                 .await
                             {
                                 eprintln!(
-                                    "[ERROR] Listener - service: {} from: {} Error: {:?}",
-                                    name, peer_addr, err
+                                    "[https listener error]: name: {} - from: {} - error: {:?}",
+                                    frontend_name, peer_addr, err
                                 );
                             }
                         });

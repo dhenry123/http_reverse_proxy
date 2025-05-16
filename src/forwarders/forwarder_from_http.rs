@@ -18,7 +18,10 @@ pub async fn proxy_from_http(
     frontend_name: String,
     addr: SocketAddr,
 ) -> Result<(), GenericError> {
-    println!("HTTP listener: {} is listening on: {}", frontend_name, addr);
+    println!(
+        "HTTP listener: {} is listening on: {}",
+        &frontend_name, addr
+    );
 
     let client = get_http_client();
     let listener = TcpListener::bind(addr).await?;
@@ -26,13 +29,13 @@ pub async fn proxy_from_http(
     loop {
         match listener.accept().await {
             Ok((tcp, peer_addr)) => {
+                let frontend_name = frontend_name.clone();
                 let svc = {
                     // Clone the values we need to move into the closure
                     let client = client.clone();
                     let servers_tracker = servers_tracker.clone();
                     let config = config.clone();
                     let frontend_name = frontend_name.clone();
-
                     // Create the service_fn
                     service_fn(move |mut req: Request<hyper::body::Incoming>| {
                         // Insert extensions
@@ -50,6 +53,7 @@ pub async fn proxy_from_http(
 
                 tokio::task::spawn(async move {
                     let svc = svc.clone();
+                    let frontend_name = frontend_name.clone();
                     if let Err(err) = http1::Builder::new()
                         .timer(TokioTimer::new())
                         .preserve_header_case(true)
@@ -58,7 +62,10 @@ pub async fn proxy_from_http(
                         .with_upgrades()
                         .await
                     {
-                        eprintln!("[ERROR] Error serving connection: {:?}", err);
+                        eprintln!(
+                            "[https listener error]: name: {} - from: {} - errror: {:?}",
+                            frontend_name, peer_addr, err
+                        );
                     }
                 });
             }

@@ -14,11 +14,17 @@ use crate::{
         HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP, HTTP_INTERNAL_SERVER,
         INTERNAL_ROUTE_ANTIBOT, INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
     },
-    forwarders::forwarder_helper::{get_upstream_uri, is_domain_configured_for_antibot},
+    forwarders::{
+        forwarder_helper::{get_upstream_uri, is_domain_configured_for_antibot},
+        forwarder_ws::handle_websocket_upgrade,
+    },
     structs::ProxyConfig,
 };
 
-use super::{forwarder_helper::is_cookie_antibot, servers_tracker::ServerTracker};
+use super::{
+    forwarder_helper::{is_cookie_antibot, is_websocket_request},
+    servers_tracker::ServerTracker,
+};
 
 /**
  * Alter output header client->listener (Response)
@@ -87,9 +93,10 @@ pub async fn handle_request(
         .clone();
     //println!("config: {:?}", config);
 
-    // if is_websocket_request(&req) {
-    //     return handle_websocket_upgrade(req, servers_tracker).await;
-    // }
+    if is_websocket_request(&req) {
+        println!("websocket request detected");
+        return handle_websocket_upgrade(req, servers_tracker).await;
+    }
 
     let client = req
         .extensions()
@@ -117,7 +124,7 @@ pub async fn handle_request(
     );
 
     // upstream uri
-    let mut upstream_uri = get_upstream_uri(original_host.clone(), servers_tracker.clone());
+    let mut upstream_uri = get_upstream_uri(original_host.clone(), servers_tracker.clone(), false);
     if upstream_uri == "" {
         // Internal server - No server available
         upstream_uri = format!(
@@ -180,7 +187,7 @@ pub async fn handle_request(
             Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
         }
         Err(e) => {
-            eprintln!("Request forwarding error: {:?}", e);
+            eprintln!("Request forwarding error: {:?}", e,);
             // @todo
             // set backend disabled
             // return html content
