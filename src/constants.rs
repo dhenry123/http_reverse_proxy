@@ -10,9 +10,6 @@ pub const DEFAULT_TLS_CERT_PATH: &str = "/etc/http_reverse_proxy/certs";
 pub const HTTP_HEADER_X_FORWARDED_FOR: &str = "X-Forwarded-For";
 pub const HTTP_HEADER_X_REAL_IP: &str = "X-Real-IP";
 
-//internal ports
-pub const HTTP_INTERNAL_SERVER: u16 = 2201;
-
 // antibot
 pub const ANTIBOT_COOKIE_NAME: &str = "antibot";
 

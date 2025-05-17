@@ -11,7 +11,10 @@ use tokio_tungstenite::{
     tungstenite::{self, Message},
 };
 
-use crate::constants::{HTTP_INTERNAL_SERVER, INTERNAL_ROUTE_MAKE_WEBSOCKET, SECRET_WS_GUID};
+use crate::{
+    constants::{INTERNAL_ROUTE_MAKE_WEBSOCKET, SECRET_WS_GUID},
+    internal_server_free_port,
+};
 
 use super::{
     forwarder_helper::{get_http_client, get_upstream_uri},
@@ -52,7 +55,9 @@ pub async fn handle_websocket_upgrade(
     // Create the upgrade response from internal (because of the Incoming type)
     let internal_upstream_uri = format!(
         "http://127.0.0.1:{}/{}/{}",
-        HTTP_INTERNAL_SERVER, INTERNAL_ROUTE_MAKE_WEBSOCKET, accept
+        internal_server_free_port::get_global_port(),
+        INTERNAL_ROUTE_MAKE_WEBSOCKET,
+        accept
     );
     println!("Uri to get websocket header: {}", internal_upstream_uri);
     let forwarded_req = {

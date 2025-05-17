@@ -2,16 +2,17 @@ mod config_manager;
 mod constants;
 mod forwarders;
 mod html;
+mod internal_server_free_port;
 mod structs;
 
 use arc_swap::ArcSwap;
 use clap::Parser;
 use config_manager::{Args, ConfigManager};
-use constants::HTTP_INTERNAL_SERVER;
 use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
 use forwarders::internal_http::internal_http;
 use forwarders::servers_tracker::ServerTracker;
+use std::process;
 use structs::GenericError;
 
 use std::net::{IpAddr, SocketAddr};
@@ -87,13 +88,16 @@ async fn main() -> Result<(), GenericError> {
     }
     // Internal frontend http (hard because i don't know how to implement a fake Response<Incoming> in listeners when backend is disabled
     let ipaddr = parse_bind_address("127.0.0.1").unwrap();
-    let addr = SocketAddr::from((ipaddr, HTTP_INTERNAL_SERVER));
+    let port = internal_server_free_port::init_global_port(23000, 27000);
+    let addr = SocketAddr::from((ipaddr, port));
     let server_task: tokio::task::JoinHandle<()>;
 
     let frontend_name = "internal".to_string();
     server_task = tokio::spawn(async move {
         if let Err(e) = internal_http(frontend_name.clone(), addr).await {
             eprintln!("Frontend {} crashed: {}", frontend_name, e);
+            eprintln!("Fatal error, exiting");
+            process::exit(10);
         }
     });
     listeners.push(server_task);

@@ -11,13 +11,14 @@ use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
     constants::{
-        HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP, HTTP_INTERNAL_SERVER,
-        INTERNAL_ROUTE_ANTIBOT, INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
+        HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP, INTERNAL_ROUTE_ANTIBOT,
+        INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
     },
     forwarders::{
         forwarder_helper::{get_upstream_uri, is_domain_configured_for_antibot},
         forwarder_ws::handle_websocket_upgrade,
     },
+    internal_server_free_port,
     structs::ProxyConfig,
 };
 
@@ -129,7 +130,7 @@ pub async fn handle_request(
         // Internal server - No server available
         upstream_uri = format!(
             "http://127.0.0.1:{}/{}{}",
-            HTTP_INTERNAL_SERVER,
+            internal_server_free_port::get_global_port(),
             INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
             parts.uri.to_string()
         );
@@ -139,7 +140,8 @@ pub async fn handle_request(
             if !is_cookie_antibot(parts.headers.get("cookie")) {
                 upstream_uri = format!(
                     "http://127.0.0.1:{}/{}",
-                    HTTP_INTERNAL_SERVER, INTERNAL_ROUTE_ANTIBOT,
+                    internal_server_free_port::get_global_port(),
+                    INTERNAL_ROUTE_ANTIBOT,
                 );
             }
         }
