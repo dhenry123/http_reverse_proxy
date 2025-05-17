@@ -4,9 +4,11 @@ DHENRY for Mytinydc.com
 
 This project has been built with the AI Deepseek, for the fun and to learn Rust.
 
+<a href="https://www.mytinydc.com/en/blog/news-2025-mai-11/" target="_story">_The story behind this software (clic here)_</a>
+
 ## Installation
 
-- Need rust
+- <a href="https://www.rust-lang.org/tools/install" target="_rust">The Rust tool chain is mandatory</a>
 - build
 
 ```bash
@@ -42,8 +44,8 @@ To test operation, use the command: `node_modules/.bin/wscat -c ws://localhost:8
 - Frontends :
   - [x] Listeners HTTP/HTTPS
   - upgrade websocket
-    - [ ] HTTP
-    - [ ] HTTPS
+    - [x] HTTP
+    - [x] HTTPS
 - Backends :
   - [x] HTTP et HTTPS (including websockets)
 - [x] Roundrobin distribution, **only**
