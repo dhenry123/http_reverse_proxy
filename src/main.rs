@@ -1,13 +1,13 @@
 mod config_manager;
 mod constants;
 mod forwarders;
+mod html;
 mod structs;
 
 use arc_swap::ArcSwap;
 use clap::Parser;
 use config_manager::{Args, ConfigManager};
-use constants::{HTTP_INTERNAL_ANTIBOT_PORT, HTTP_INTERNAL_ERROR_PORT};
-use forwarders::antibot_http::antibot_http;
+use constants::HTTP_INTERNAL_SERVER;
 use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
 use forwarders::internal_http::internal_http;
@@ -87,25 +87,12 @@ async fn main() -> Result<(), GenericError> {
     }
     // Internal frontend http (hard because i don't know how to implement a fake Response<Incoming> in listeners when backend is disabled
     let ipaddr = parse_bind_address("127.0.0.1").unwrap();
-    let addr = SocketAddr::from((ipaddr, HTTP_INTERNAL_ERROR_PORT));
+    let addr = SocketAddr::from((ipaddr, HTTP_INTERNAL_SERVER));
     let server_task: tokio::task::JoinHandle<()>;
 
     let frontend_name = "internal".to_string();
     server_task = tokio::spawn(async move {
         if let Err(e) = internal_http(frontend_name.clone(), addr).await {
-            eprintln!("Frontend {} crashed: {}", frontend_name, e);
-        }
-    });
-    listeners.push(server_task);
-
-    // Internal anti-bot server (hard because i don't know how to implement a fake Response<Incoming> in listeners when backend is disabled
-    let ipaddr = parse_bind_address("127.0.0.1").unwrap();
-    let addr = SocketAddr::from((ipaddr, HTTP_INTERNAL_ANTIBOT_PORT));
-    let server_task: tokio::task::JoinHandle<()>;
-
-    let frontend_name = "internal".to_string();
-    server_task = tokio::spawn(async move {
-        if let Err(e) = antibot_http(frontend_name.clone(), addr).await {
             eprintln!("Frontend {} crashed: {}", frontend_name, e);
         }
     });

@@ -10,12 +10,21 @@ use hyper_util::client::legacy::{Client, connect::HttpConnector};
 use std::{net::SocketAddr, sync::Arc};
 
 use crate::{
-    constants::{HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP},
-    forwarders::forwarder_helper::{CookieJar, get_upstream_uri, is_domain_configured_for_antibot},
+    constants::{
+        HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP, HTTP_INTERNAL_SERVER,
+        INTERNAL_ROUTE_ANTIBOT, INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
+    },
+    forwarders::{
+        forwarder_helper::{get_upstream_uri, is_domain_configured_for_antibot},
+        forwarder_ws::handle_websocket_upgrade,
+    },
     structs::ProxyConfig,
 };
 
-use super::servers_tracker::ServerTracker;
+use super::{
+    forwarder_helper::{is_cookie_antibot, is_websocket_request},
+    servers_tracker::ServerTracker,
+};
 
 /**
  * Alter output header client->listener (Response)
@@ -84,9 +93,10 @@ pub async fn handle_request(
         .clone();
     //println!("config: {:?}", config);
 
-    // if is_websocket_request(&req) {
-    //     return handle_websocket_upgrade(req, servers_tracker).await;
-    // }
+    if is_websocket_request(&req) {
+        println!("websocket request detected");
+        return handle_websocket_upgrade(req, servers_tracker).await;
+    }
 
     let client = req
         .extensions()
@@ -114,47 +124,26 @@ pub async fn handle_request(
     );
 
     // upstream uri
-    let mut upstream_uri = get_upstream_uri(original_host.clone(), servers_tracker.clone());
+    let mut upstream_uri = get_upstream_uri(original_host.clone(), servers_tracker.clone(), false);
     if upstream_uri == "" {
-        upstream_uri = "http://127.0.0.1:2201".to_string();
+        // Internal server - No server available
+        upstream_uri = format!(
+            "http://127.0.0.1:{}/{}{}",
+            HTTP_INTERNAL_SERVER,
+            INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
+            parts.uri.to_string()
+        );
     } else {
         // antibot for this host ?
         if is_antibot_protected {
-            let cookies_list = parts.headers.get("cookie");
-            // No cookie return antibot service
-            if cookies_list.is_none() {
-                //println!("antibot cookie not detected");
+            if !is_cookie_antibot(parts.headers.get("cookie")) {
                 upstream_uri = format!(
-                    "http://127.0.0.1:2202{}{}",
-                    parts.uri.path(),
-                    parts
-                        .uri
-                        .query()
-                        .map(|q| format!("?{}", q))
-                        .unwrap_or_default()
+                    "http://127.0.0.1:{}/{}",
+                    HTTP_INTERNAL_SERVER, INTERNAL_ROUTE_ANTIBOT,
                 );
-            } else {
-                //println!("cookie detected: {:?}", cookies_list);
-                let jar = CookieJar::from_header(cookies_list.unwrap().to_str().unwrap());
-                // cookie not detected ?
-                let antibot_cookie_value = jar.get_value("antibot");
-                // naive condition
-                if antibot_cookie_value.is_none() {
-                    //println!("antibot cookie not detected");
-                    upstream_uri = "http://127.0.0.1:2201".to_string();
-                }
             }
         }
-        upstream_uri = format!(
-            "{}{}{}",
-            upstream_uri,
-            parts.uri.path(),
-            parts
-                .uri
-                .query()
-                .map(|q| format!("?{}", q))
-                .unwrap_or_default()
-        );
+        upstream_uri = format!("{}{}", upstream_uri, parts.uri.to_string());
     }
     let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
     //====> To check round robin load balance
@@ -198,7 +187,7 @@ pub async fn handle_request(
             Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
         }
         Err(e) => {
-            eprintln!("Request forwarding error: {:?}", e);
+            eprintln!("Request forwarding error: {:?}", e,);
             // @todo
             // set backend disabled
             // return html content

@@ -4,9 +4,11 @@ DHENRY for Mytinydc.com
 
 This project has been built with the AI Deepseek, for the fun and to learn Rust.
 
+<a href="https://www.mytinydc.com/en/blog/news-2025-mai-11/" target="_story">_The story behind this software (clic here)_</a>
+
 ## Installation
 
-- Need rust
+- <a href="https://www.rust-lang.org/tools/install" target="_rust">The Rust tool chain is mandatory</a>
 - build
 
 ```bash
@@ -24,22 +26,35 @@ mkdir -p /etc/http_reverse_proxy/certs/
 
 ## Websocket test server
 
-Need Nodejs, and used to start a simple websocket server. Code has been provided by the DeepSeep AI.
+Requires installation of Nodejs. This service implements a simplistic websockets server. The Js code has been provided by the DeepSeep AI.
+
+```bash
+# install Nodejs
+sudo apt install nodejs
+npm install
+```
+
+Run the service (default listener port is 8080) : `nodejs wsserver.js`
+
+To test operation, use the command: `node_modules/.bin/wscat -c ws://localhost:8080`
 
 ## Roadmap
 
 - [x] Yaml Configuration: frontend ⇨ acl ⇨ backend ⇨ servers
 - Frontends :
   - [x] Listeners HTTP/HTTPS
-  - [ ] upgrade websocket
+  - upgrade websocket
+    - [x] HTTP
+    - [x] HTTPS
 - Backends :
-  - [x] HTTP et HTTPS
+  - [x] HTTP et HTTPS (including websockets)
 - [x] Roundrobin distribution, **only**
 - [x] Inserting the “X-Forwarded-For” header
 - [ ] API Rest for configuration changes
 - [ ] Apply configuration without restarting (hot-reload)
 - [x] Automatic loading of certificates (pem format) for TLS resolution
 - [x] Integrate a (basic) anti-bot system. The aim is not to develop a complete system, but to attempt an implementation at the heart of the LoadBalancer.
+- [ ] Tls certificate fallback
 
 ## Licence
 

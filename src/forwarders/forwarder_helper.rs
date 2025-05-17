@@ -1,7 +1,7 @@
 use std::{collections::HashMap, error::Error, fs, path::PathBuf, sync::Arc, time::Duration};
 
 use arc_swap::{ArcSwap, ArcSwapAny};
-use hyper::body;
+use hyper::{Request, body, header::HeaderValue};
 use hyper_tls::HttpsConnector;
 use hyper_util::{
     client::legacy::{Client, connect::HttpConnector},
@@ -10,13 +10,15 @@ use hyper_util::{
 use rustls::{ServerConfig, crypto::aws_lc_rs::sign::any_supported_type, sign::CertifiedKey};
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use uuid::Uuid;
 
 use crate::{
-    constants::{POOL_IDLE_TIMEOUT, POOL_MAX_IDLE_PER_HOST},
+    constants::{ANTIBOT_COOKIE_NAME, POOL_IDLE_TIMEOUT, POOL_MAX_IDLE_PER_HOST},
     structs::{BackendServer, GenericError, GenericResult, ProxyConfig},
 };
 
 use super::servers_tracker::ServerTracker;
+use cookie::Cookie;
 
 pub fn build_upstream_uri(backend_server: BackendServer, is_web_socket: bool) -> String {
     let mut upstream: String;
@@ -164,6 +166,7 @@ pub fn get_http_client() -> Client<hyper_tls::HttpsConnector<HttpConnector>, bod
 pub fn get_upstream_uri(
     original_host: String,
     servers_tracker: Arc<ArcSwapAny<Arc<ServerTracker>>>,
+    is_web_socket: bool,
 ) -> String {
     // Which backend ?
     let backend_server = servers_tracker
@@ -172,33 +175,9 @@ pub fn get_upstream_uri(
         .get_next_backend(&original_host);
     //println!("backend_server: {:?}", backend_server);
     if backend_server.is_some() {
-        build_upstream_uri(backend_server.unwrap(), false)
+        build_upstream_uri(backend_server.unwrap(), is_web_socket)
     } else {
         "".to_string()
-    }
-}
-
-pub struct CookieJar<'a> {
-    cookies: HashMap<&'a str, &'a str>,
-}
-
-impl<'a> CookieJar<'a> {
-    pub fn from_header(cookie_header: &'a str) -> Self {
-        let mut cookies = HashMap::new();
-
-        for cookie in cookie_header.split(';') {
-            let cookie = cookie.trim();
-            if let Some((name, value)) = cookie.split_once('=') {
-                cookies.insert(name, value);
-            }
-        }
-
-        Self { cookies }
-    }
-
-    #[inline]
-    pub fn get_value(&self, name: &str) -> Option<&str> {
-        self.cookies.get(name).map_or(None, |&val| Some(val))
     }
 }
 
@@ -232,4 +211,43 @@ pub fn is_domain_configured_for_antibot(
     }
     // println!("Not configured with antibot");
     return false;
+}
+
+/**
+ * Simple cookie...
+ */
+pub fn get_cookie_antibot(host: String) -> Cookie<'static> {
+    let cookie = Cookie::build((ANTIBOT_COOKIE_NAME, Uuid::new_v4().to_string()))
+        .domain(host)
+        .path("/")
+        .secure(false)
+        .http_only(true)
+        .same_site(cookie::SameSite::Strict)
+        .max_age(cookie::time::Duration::hours(2))
+        .build();
+    return cookie;
+}
+
+pub fn is_cookie_antibot(cookie_http_header: Option<&HeaderValue>) -> bool {
+    if cookie_http_header.is_none() {
+        return false;
+    } else {
+        // check antibot cookie
+        for cookie in Cookie::split_parse(cookie_http_header.unwrap().to_str().unwrap()) {
+            let cookie = cookie;
+            if cookie.is_ok() && cookie.unwrap().name() == ANTIBOT_COOKIE_NAME {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+// Helper function to check WebSocket request
+pub fn is_websocket_request(req: &Request<hyper::body::Incoming>) -> bool {
+    req.headers()
+        .get("Upgrade")
+        .and_then(|h| h.to_str().ok())
+        .map(|h| h.eq_ignore_ascii_case("websocket"))
+        .unwrap_or(false)
 }
