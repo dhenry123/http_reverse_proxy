@@ -2,15 +2,12 @@ use arc_swap::ArcSwapAny;
 use hyper::{Request, server::conn::http1, service::service_fn};
 
 use hyper_util::rt::{TokioIo, TokioTimer};
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, time::Instant};
 use tokio_rustls::TlsAcceptor;
 
 use crate::{
-    forwarders::{
-        forwarder_handler::handle_request,
-        forwarder_helper::{create_tls_config, get_http_client, load_combined_pems},
-    },
+    forwarders::{forwarder_handler::handle_request, forwarder_helper::get_http_client},
     structs::{GenericError, ProxyConfig},
 };
 
@@ -18,14 +15,11 @@ use super::servers_tracker::ServerTracker;
 
 pub async fn proxy_from_https(
     config: Arc<ArcSwapAny<Arc<ProxyConfig>>>,
-    certs_path: PathBuf,
+    tls_acceptor: TlsAcceptor,
     servers_tracker: Arc<arc_swap::ArcSwapAny<Arc<ServerTracker>>>,
     frontend_name: String,
     addr: SocketAddr,
 ) -> Result<(), GenericError> {
-    // Load all certificates from directory
-    let cert_map = load_combined_pems(certs_path)?;
-    let tls_config = create_tls_config(cert_map)?;
     let client = get_http_client();
 
     // Listener
@@ -35,9 +29,6 @@ pub async fn proxy_from_https(
         frontend_name.clone(),
         addr
     );
-
-    // Pre-create the TLS acceptor
-    let tls_acceptor = TlsAcceptor::from(tls_config);
 
     // Use a connection pool or limit for production
     let connection_limit = tokio::sync::Semaphore::new(100); // Adjust based on expected load

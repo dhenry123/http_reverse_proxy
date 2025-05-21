@@ -3,15 +3,19 @@ mod constants;
 mod forwarders;
 mod html;
 mod internal_server_free_port;
+mod self_signed_cert;
 mod structs;
 
 use arc_swap::ArcSwap;
 use clap::Parser;
 use config_manager::{Args, ConfigManager};
+use constants::DEFAULT_TLS_CERTIFICAT_FILENAME;
 use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
 use forwarders::internal_http::internal_http;
 use forwarders::servers_tracker::ServerTracker;
+use forwarders::tls_acceptor::init_tls_acceptor;
+use self_signed_cert::generate_default_cert;
 use std::process;
 use structs::GenericError;
 
@@ -32,7 +36,16 @@ async fn main() -> Result<(), GenericError> {
     config_manager.load().await?;
     let config = config_manager.get_config().await;
     let certs_path = config_manager.get_config_tls_certs_path().await;
+
+    // default SSL certificate exists ?
+    if !certs_path.join(DEFAULT_TLS_CERTIFICAT_FILENAME).exists() {
+        println!("Creating default ssl certificate");
+        generate_default_cert(&certs_path)?;
+    }
     let mut listeners = Vec::new();
+
+    // One TLS Acceptor
+    let tls_acceptor = init_tls_acceptor(certs_path)?;
     // Starting frontends
     for frontend in config.load().as_ref().clone().frontends {
         if !frontend.active {
@@ -43,9 +56,9 @@ async fn main() -> Result<(), GenericError> {
         let addr = SocketAddr::from((ipaddr, frontend.port));
         let cfg = config.clone();
         let server_task: tokio::task::JoinHandle<()>;
-        let certs_path = certs_path.clone();
         if frontend.tls {
             // Frontend https
+            let tls_acceptor = tls_acceptor.clone();
             server_task = tokio::spawn(async move {
                 let servers_tracker: Arc<arc_swap::ArcSwapAny<Arc<ServerTracker>>> =
                     Arc::new(ArcSwap::new({
@@ -53,18 +66,17 @@ async fn main() -> Result<(), GenericError> {
                         tracker.populate(frontend.clone().name, cfg.clone());
                         Arc::new(tracker)
                     }));
-                let certs_path = certs_path.clone();
 
                 if let Err(e) = proxy_from_https(
                     cfg.clone(),
-                    certs_path,
+                    tls_acceptor,
                     servers_tracker,
                     frontend.clone().name,
                     addr,
                 )
                 .await
                 {
-                    eprintln!("Frontend {} crashed: {}", frontend.name, e);
+                    eprintln!("[Error] Frontend {} crashed: {}", frontend.name, e);
                 }
             });
         } else {
@@ -80,7 +92,7 @@ async fn main() -> Result<(), GenericError> {
                 if let Err(e) =
                     proxy_from_http(cfg.clone(), servers_tracker, frontend.clone().name, addr).await
                 {
-                    eprintln!("Frontend {} crashed: {}", frontend.name, e);
+                    eprintln!("[Error] Frontend {} crashed: {}", frontend.name, e);
                 }
             });
         }
@@ -95,7 +107,7 @@ async fn main() -> Result<(), GenericError> {
     let frontend_name = "internal".to_string();
     server_task = tokio::spawn(async move {
         if let Err(e) = internal_http(frontend_name.clone(), addr).await {
-            eprintln!("Frontend {} crashed: {}", frontend_name, e);
+            eprintln!("[Error] Frontend {} crashed: {}", frontend_name, e);
             eprintln!("Fatal error, exiting");
             process::exit(10);
         }

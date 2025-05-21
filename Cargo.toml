@@ -39,3 +39,8 @@ uuid = { version = "1.16.0", features = ["v4", "std"] }
 ## config
 clap = { version = "4.0", features = ["derive"] }
 cookie = "0.18.1"
+## Self signed certificates
+rcgen = "0.13"
+
+[dev-dependencies]
+tempfile = "3.20"

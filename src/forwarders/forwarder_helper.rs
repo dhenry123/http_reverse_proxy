@@ -66,12 +66,6 @@ pub fn create_tls_config(
     let config = ServerConfig::builder()
         .with_no_client_auth()
         .with_cert_resolver(Arc::new(cert_resolver));
-    //.with_safe_default_cipher_suites()
-    //.with_safe_default_kx_groups()
-    //.with_protocol_versions(versions)
-    // .map_err(|e| format!("TLS version configuration failed: {}", e))?
-    // .with_no_client_auth()
-    // .with_cert_resolver(Arc::new(cert_resolver)); // Proper builder method
 
     Ok(Arc::new(config))
 }
