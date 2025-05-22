@@ -42,6 +42,7 @@
     {
       "type": "shell",
       "command": "target/release/http_reverse_proxy",
+      "args": ["-c", "./config.yaml", "-t", "./certs"],
       "label": "run release"
     }
   ]

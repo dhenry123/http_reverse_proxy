@@ -8,16 +8,34 @@ This project has been built with the AI Deepseek, for the fun and to learn Rust.
 
 ## Installation
 
+### Download binary
+
+Download from the latest release: <https://github.com/dhenry123/http_reverse_proxy/releases> => Assets
+
+```bash
+sudo cp <downloaded file> /usr/local/bin
+# If you need to listen on port under 1024 as non root
+sudo setcap 'cap_net_bind_service=+ep' /usr/local/bin/http_reverse_proxy
+# to store config and tls certificates (pem)
+sudo mkdir -p /etc/http_reverse_proxy/certs/
+```
+
+- Create config.yaml: copy from config-sample.yaml
+- copy config.yaml to `/etc/http_reverse_proxy/`, you could specify an other path with the parameter "-c"
+- run `nohup http_reverse_proxy &`
+
+### Build
+
 - <a href="https://www.rust-lang.org/tools/install" target="_rust">The Rust tool chain is mandatory</a>
 - build
 
 ```bash
 cargo build --release
-# If you need to listen on port under 1024 as non root
-sudo setcap 'cap_net_bind_service=+ep' target/release/http_reverse_proxy
 cp target/release/http_reverse_proxy /usr/local/bin
+# If you need to listen on port under 1024 as non root
+sudo setcap 'cap_net_bind_service=+ep' /usr/local/bin/http_reverse_proxy
 # to store config and tls certificates (pem)
-mkdir -p /etc/http_reverse_proxy/certs/
+sudo mkdir -p /etc/http_reverse_proxy/certs/
 ```
 
 - Create config.yaml: copy from config-sample.yaml
