@@ -14,7 +14,7 @@ opt-level = 3  # Release (fast runtime)
 hyper = { version = "1.6.0", features = ["full"] }
 hyper-tls = "0"
 http-body-util = "0.1"
-hyper-util = { version = "0.1", features = ["full"] }
+hyper-util = { version = "0.1.12", features = ["full"] }
 tokio = { version = "1.44.2", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
