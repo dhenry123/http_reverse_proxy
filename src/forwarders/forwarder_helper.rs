@@ -59,9 +59,6 @@ pub fn create_tls_config(
         println!("Tls domain loaded: {}", domain);
     }
 
-    // Support both TLS 1.2 and 1.3 for better compatibility
-    //let versions: &[&SupportedProtocolVersion] = &[&TLS12, &TLS13];
-
     // Build final configuration
     let config = ServerConfig::builder()
         .with_no_client_auth()

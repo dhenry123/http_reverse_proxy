@@ -1,4 +1,6 @@
 use arc_swap::ArcSwap;
+use bytes::Bytes;
+use http_body_util::Full;
 use hyper::{
     HeaderMap, Request, Response, Uri,
     body::{self, Incoming},
@@ -6,8 +8,12 @@ use hyper::{
 };
 
 use hyper_tls::HttpsConnector;
-use hyper_util::client::legacy::{Client, connect::HttpConnector};
+use hyper_util::{
+    client::legacy::{Client, connect::HttpConnector},
+    rt::TokioExecutor,
+};
 use std::{net::SocketAddr, sync::Arc};
+use tokio_tungstenite::tungstenite::http;
 
 use crate::{
     constants::{
@@ -128,21 +134,12 @@ pub async fn handle_request(
     let mut upstream_uri = get_upstream_uri(original_host.clone(), servers_tracker.clone(), false);
     if upstream_uri == "" {
         // Internal server - No server available
-        upstream_uri = format!(
-            "http://127.0.0.1:{}/{}{}",
-            internal_server_free_port::get_global_port(),
-            INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
-            parts.uri.to_string()
-        );
+        upstream_uri = get_internal_error_no_backend_server_available_uri(parts.clone());
     } else {
         // antibot for this host ?
         if is_antibot_protected {
             if !is_cookie_antibot(parts.headers.get("cookie")) {
-                upstream_uri = format!(
-                    "http://127.0.0.1:{}/{}",
-                    internal_server_free_port::get_global_port(),
-                    INTERNAL_ROUTE_ANTIBOT,
-                );
+                upstream_uri = get_internal_antibot_uri();
             }
         }
         upstream_uri = format!("{}{}", upstream_uri, parts.uri.to_string());
@@ -151,49 +148,94 @@ pub async fn handle_request(
     //====> To check round robin load balance
     // println!("upstream_uri: {}", upstream_uri);
 
-    // Build forwarded request with all original headers
-    let forwarded_req = {
-        let mut builder = Request::builder().method(parts.method).uri(upstream_uri);
-
-        // Copy all headers from original request
-        for (name, value) in parts.headers.iter() {
-            builder = builder.header(name, value);
-        }
-
-        // Add X-forwarded-for headers
-        let peer_ip_as_string = peer_addr.ip().to_string();
-        let peer_as_str = peer_ip_as_string.as_str();
-        let mut headers_map = HeaderMap::new();
-        headers_map.append(
-            HTTP_HEADER_X_FORWARDED_FOR,
-            HeaderValue::from_str(peer_as_str).unwrap(),
-        );
-        headers_map.append(
-            HTTP_HEADER_X_REAL_IP,
-            HeaderValue::from_str(peer_as_str).unwrap(),
-        );
-        let _ = builder.headers_mut().insert(&mut headers_map);
-
-        // Body
-        builder.body(body).unwrap()
-    };
+    let forwarded_req = get_forwarded_red(parts.clone(), upstream_uri.clone(), peer_addr, body);
 
     // println!("Forwarding traffic for {}", name);
     let response = client.request(forwarded_req).await;
 
     match response {
         Ok(mut response) => {
+            // replace backend host response with original host
             let original_host = original_host.clone();
             set_response_header(original_host, &mut response).await;
             //println!("Response before sending to http server: {:?}", response);
             Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
         }
-        Err(e) => {
-            eprintln!("Request forwarding error: {:?}", e,);
-            // @todo
-            // set backend disabled
-            // return html content
-            Err(e)
+        Err(initial_error) => {
+            eprintln!(
+                "Request forwarding initial error: {:?} - upstream uri: {}",
+                initial_error, upstream_uri
+            );
+            // Return internal response unavailable service 503
+            let upstream_uri = get_internal_error_no_backend_server_available_uri(parts.clone());
+            let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
+            let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
+            let response = client.get(upstream_uri).await;
+            match response {
+                Ok(mut response) => {
+                    let original_host = original_host.clone();
+                    set_response_header(original_host, &mut response).await;
+                    Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
+                }
+                Err(internal_server_error) => {
+                    eprintln!(
+                        "Request forwarding calling internal server, error: {:?}",
+                        internal_server_error
+                    );
+                    Err(initial_error)
+                }
+            }
         }
     }
+}
+
+fn get_internal_antibot_uri() -> String {
+    format!(
+        "http://127.0.0.1:{}/{}",
+        internal_server_free_port::get_global_port(),
+        INTERNAL_ROUTE_ANTIBOT,
+    )
+}
+
+fn get_internal_error_no_backend_server_available_uri(parts: http::request::Parts) -> String {
+    format!(
+        "http://127.0.0.1:{}/{}{}",
+        internal_server_free_port::get_global_port(),
+        INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
+        parts.uri.to_string()
+    )
+}
+
+/**
+ * Build forwarded request with all original headers
+ */
+fn get_forwarded_red(
+    parts: http::request::Parts,
+    upstream_uri: Uri,
+    peer_addr: SocketAddr,
+    body: Incoming,
+) -> hyper::Request<hyper::body::Incoming> {
+    let mut builder = Request::builder().method(parts.method).uri(upstream_uri);
+
+    // Copy all headers from original request
+    for (name, value) in parts.headers.iter() {
+        builder = builder.header(name, value);
+    }
+
+    // Add X-forwarded-for headers
+    let peer_ip_as_string = peer_addr.ip().to_string();
+    let peer_as_str = peer_ip_as_string.as_str();
+    let mut headers_map = HeaderMap::new();
+    headers_map.append(
+        HTTP_HEADER_X_FORWARDED_FOR,
+        HeaderValue::from_str(peer_as_str).unwrap(),
+    );
+    headers_map.append(
+        HTTP_HEADER_X_REAL_IP,
+        HeaderValue::from_str(peer_as_str).unwrap(),
+    );
+    let _ = builder.headers_mut().insert(&mut headers_map);
+
+    // Body
+    builder.body(body).unwrap()
 }

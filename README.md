@@ -54,7 +54,7 @@ To test operation, use the command: `node_modules/.bin/wscat -c ws://localhost:8
 - [ ] Apply configuration without restarting (hot-reload)
 - [x] Automatic loading of certificates (pem format) for TLS resolution
 - [x] Integrate a (basic) anti-bot system. The aim is not to develop a complete system, but to attempt an implementation at the heart of the LoadBalancer.
-- [ ] Tls certificate fallback
+- [ ] _Tls certificate fallback (later)_
 
 ## Licence
 

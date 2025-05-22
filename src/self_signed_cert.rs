@@ -6,6 +6,13 @@ use std::path::PathBuf;
 use crate::constants::DEFAULT_TLS_CERTIFICAT_FILENAME;
 use crate::structs::GenericError;
 
+// TLS
+//pub const DEFAULT_TLS_CERTIFICAT_FILENAME: &str = "localhost.pem";
+// // default SSL certificate exists ?
+// if !certs_path.join(DEFAULT_TLS_CERTIFICAT_FILENAME).exists() {
+//     println!("Creating default ssl certificate");
+//     generate_default_cert(&certs_path)?;
+// }
 pub fn generate_default_cert(path: &PathBuf) -> Result<(), GenericError> {
     let mut params: CertificateParams = Default::default();
     params.not_before = date_time_ymd(1975, 1, 1);

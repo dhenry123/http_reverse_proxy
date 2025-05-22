@@ -3,19 +3,16 @@ mod constants;
 mod forwarders;
 mod html;
 mod internal_server_free_port;
-mod self_signed_cert;
 mod structs;
 
 use arc_swap::ArcSwap;
 use clap::Parser;
 use config_manager::{Args, ConfigManager};
-use constants::DEFAULT_TLS_CERTIFICAT_FILENAME;
 use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
 use forwarders::internal_http::internal_http;
 use forwarders::servers_tracker::ServerTracker;
 use forwarders::tls_acceptor::init_tls_acceptor;
-use self_signed_cert::generate_default_cert;
 use std::process;
 use structs::GenericError;
 
@@ -37,11 +34,6 @@ async fn main() -> Result<(), GenericError> {
     let config = config_manager.get_config().await;
     let certs_path = config_manager.get_config_tls_certs_path().await;
 
-    // default SSL certificate exists ?
-    if !certs_path.join(DEFAULT_TLS_CERTIFICAT_FILENAME).exists() {
-        println!("Creating default ssl certificate");
-        generate_default_cert(&certs_path)?;
-    }
     let mut listeners = Vec::new();
 
     // One TLS Acceptor
