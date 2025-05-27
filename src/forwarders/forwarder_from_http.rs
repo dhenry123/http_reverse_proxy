@@ -62,10 +62,13 @@ pub async fn proxy_from_http(
                         .with_upgrades()
                         .await
                     {
-                        eprintln!(
-                            "[https listener error]: name: {} - from: {} - errror: {:?}",
-                            frontend_name, peer_addr, err
-                        );
+                        // no display if IncompleteMessage
+                        if !err.is_incomplete_message() {
+                            eprintln!(
+                                "[https listener error]: name: {} - from: {} - error: {:?}",
+                                frontend_name, peer_addr, err
+                            );
+                        }
                     }
                 });
             }

@@ -5,7 +5,7 @@ use hyper::{Request, body, header::HeaderValue};
 use hyper_tls::HttpsConnector;
 use hyper_util::{
     client::legacy::{Client, connect::HttpConnector},
-    rt::TokioExecutor,
+    rt::{TokioExecutor, TokioTimer},
 };
 use rustls::{ServerConfig, crypto::aws_lc_rs::sign::any_supported_type, sign::CertifiedKey};
 
@@ -138,16 +138,20 @@ pub fn load_combined_pems(
  */
 pub fn get_http_client() -> Client<hyper_tls::HttpsConnector<HttpConnector>, body::Incoming> {
     let mut http_connector = HttpConnector::new();
+    //http_connector.set_nodelay(true);
     http_connector.set_nodelay(true);
+    http_connector.set_reuse_address(true);
     http_connector.set_keepalive(Some(std::time::Duration::from_secs(60)));
 
     let https_connector = HttpsConnector::new();
 
     Client::builder(TokioExecutor::new())
-        .pool_max_idle_per_host(POOL_MAX_IDLE_PER_HOST)
+        // .pool_max_idle_per_host(POOL_MAX_IDLE_PER_HOST)
+        .pool_max_idle_per_host(50)
         .pool_idle_timeout(Duration::from_secs(POOL_IDLE_TIMEOUT))
         .http1_preserve_header_case(true)
-        .http2_keep_alive_interval(Duration::from_secs(30))
+        .pool_timer(TokioTimer::new())
+        .pool_idle_timeout(Duration::from_secs(60))
         .build::<_, body::Incoming>(https_connector)
 }
 

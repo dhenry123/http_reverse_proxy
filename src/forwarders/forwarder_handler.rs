@@ -37,18 +37,13 @@ use super::{
  * Alter output header client->listener (Response)
  */
 pub async fn set_response_header(original_host: String, response: &mut Response<Incoming>) {
-    //println!("Backend response: {:?}", response);
     // Handle redirect responses (301, 302, etc.)
     if response.status().is_redirection() {
-        //println!("Redirection detected: {:?}", response);
         if let Some(location) = response.headers().get(hyper::header::LOCATION) {
-            //println!("location detected: {:?}", location);
             if let Ok(location_str) = location.to_str() {
                 if let Ok(location_uri) = location_str.parse::<Uri>() {
-                    //println!("location_uri: {:?}", location_uri);
                     // Check if the URI is absolute by looking for scheme
                     if location_uri.scheme_str().is_some() {
-                        //println!("scheme_str ok");
                         if original_host != "" {
                             // Get path and query
                             let path_and_query = location_uri
@@ -56,10 +51,8 @@ pub async fn set_response_header(original_host: String, response: &mut Response<
                                 .map(|pq| pq.as_str())
                                 .unwrap_or("/");
 
-                            //println!("path_and_query: {:?}", path_and_query);
                             // Rebuild URI with original proxy host/scheme
                             let new_uri = format!("https://{}{}", original_host, path_and_query);
-                            //println!("new_uri: {:?}", new_uri);
                             if let Ok(new_uri) = new_uri.parse::<Uri>() {
                                 response.headers_mut().insert(
                                     hyper::header::LOCATION,
@@ -79,10 +72,8 @@ pub async fn handle_request(
 ) -> Result<Response<body::Incoming>, hyper_util::client::legacy::Error> {
     // peer address:port
     let peer_addr = req.extensions().get::<SocketAddr>().cloned().unwrap();
-    // println!(peer_addr: "{:?}", peer_addr);
 
     let frontend_name = req.extensions().get::<String>().cloned().unwrap();
-    // println!("frontend_name: {:?}", frontend_name);
 
     let servers_tracker = req
         .extensions()
@@ -90,7 +81,6 @@ pub async fn handle_request(
         .cloned()
         .unwrap()
         .clone();
-    //println!("servers_tracker: {:?}", servers_tracker);
 
     let config = req
         .extensions()
@@ -98,7 +88,6 @@ pub async fn handle_request(
         .cloned()
         .unwrap()
         .clone();
-    //println!("config: {:?}", config);
 
     if is_websocket_request(&req) {
         println!("websocket request detected");
@@ -121,7 +110,6 @@ pub async fn handle_request(
         .and_then(|h| h.to_str().ok())
         .map(|s| s.to_string())
         .unwrap(); // Convert to &str safely
-    //println!("original_host: {}", original_host);
 
     // Prepare antibot
     let is_antibot_protected = is_domain_configured_for_antibot(
@@ -144,13 +132,41 @@ pub async fn handle_request(
         }
         upstream_uri = format!("{}{}", upstream_uri, parts.uri.to_string());
     }
-    let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
+    let uri = upstream_uri.parse::<Uri>();
+    let upstream_uri: Uri;
+    match uri {
+        Ok(uri) => upstream_uri = uri,
+        Err(initial_error) => {
+            println!("Initial error: {}", initial_error);
+            println!("Parts: {:?}", parts);
+            println!("original_host {:?}", original_host);
+            let upstream_uri = get_internal_error_no_backend_server_available_uri(parts.clone());
+            let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
+            let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
+            let response = client.get(upstream_uri).await;
+            match response {
+                Ok(mut response) => {
+                    let original_host = original_host.clone();
+                    set_response_header(original_host, &mut response).await;
+                    return Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(
+                        response,
+                    );
+                }
+                Err(internal_server_error) => {
+                    eprintln!(
+                        "Request forwarding calling internal server, error: {:?}",
+                        internal_server_error
+                    );
+                    return Err(internal_server_error);
+                }
+            }
+        }
+    }
     //====> To check round robin load balance
     // println!("upstream_uri: {}", upstream_uri);
 
     let forwarded_req = get_forwarded_red(parts.clone(), upstream_uri.clone(), peer_addr, body);
 
-    // println!("Forwarding traffic for {}", name);
     let response = client.request(forwarded_req).await;
 
     match response {
@@ -158,7 +174,6 @@ pub async fn handle_request(
             // replace backend host response with original host
             let original_host = original_host.clone();
             set_response_header(original_host, &mut response).await;
-            //println!("Response before sending to http server: {:?}", response);
             Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
         }
         Err(initial_error) => {

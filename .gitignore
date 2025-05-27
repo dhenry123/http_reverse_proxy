@@ -4,3 +4,4 @@ config.yaml
 certs/*
 !certs/.keep
 tests-before-publish.md
+BenckMarks.md
