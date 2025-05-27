@@ -20,12 +20,12 @@ use crate::{
 
 use super::forwarder_helper::get_cookie_antibot;
 
-enum InternalServerErrors {
+pub enum InternalServerErrors {
     ServerUnavailable,
     RouteNotFound,
 }
 
-async fn internal_error(
+pub async fn internal_error(
     error: InternalServerErrors,
     parts: http::request::Parts,
 ) -> Result<Response<Full<Bytes>>, Infallible> {

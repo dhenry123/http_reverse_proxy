@@ -8,6 +8,7 @@ mod structs;
 use arc_swap::ArcSwap;
 use clap::Parser;
 use config_manager::{Args, ConfigManager};
+use forwarders::api_rest::apirest_http;
 use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
 use forwarders::internal_http::internal_http;
@@ -100,6 +101,22 @@ async fn main() -> Result<(), GenericError> {
     server_task = tokio::spawn(async move {
         if let Err(e) = internal_http(frontend_name.clone(), addr).await {
             eprintln!("[Error] Frontend {} crashed: {}", frontend_name, e);
+            eprintln!("Fatal error, exiting");
+            process::exit(10);
+        }
+    });
+
+    listeners.push(server_task);
+
+    // API Rest server
+    let ipaddr = parse_bind_address("127.0.0.1").unwrap();
+    let addr = SocketAddr::from((ipaddr, 27001));
+    let server_task: tokio::task::JoinHandle<()>;
+
+    let frontend_name = "APIRest".to_string();
+    server_task = tokio::spawn(async move {
+        if let Err(e) = apirest_http(frontend_name.clone(), addr).await {
+            eprintln!("[Error] Api rest {} crashed: {}", frontend_name, e);
             eprintln!("Fatal error, exiting");
             process::exit(10);
         }
