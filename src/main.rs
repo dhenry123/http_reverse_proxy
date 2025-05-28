@@ -1,3 +1,4 @@
+mod api;
 mod config_manager;
 mod constants;
 mod forwarders;
@@ -115,7 +116,7 @@ async fn main() -> Result<(), GenericError> {
 
     let frontend_name = "APIRest".to_string();
     server_task = tokio::spawn(async move {
-        if let Err(e) = apirest_http(frontend_name.clone(), addr).await {
+        if let Err(e) = apirest_http(frontend_name.clone(), addr, config.clone()).await {
             eprintln!("[Error] Api rest {} crashed: {}", frontend_name, e);
             eprintln!("Fatal error, exiting");
             process::exit(10);

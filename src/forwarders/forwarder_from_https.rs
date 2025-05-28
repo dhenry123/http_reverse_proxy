@@ -83,10 +83,12 @@ pub async fn proxy_from_https(
                                 .with_upgrades()
                                 .await
                             {
-                                eprintln!(
-                                    "[https listener error]: name: {} - from: {} - error: {:?}",
-                                    frontend_name, peer_addr, err
-                                );
+                                if !err.is_timeout() {
+                                    eprintln!(
+                                        "[https listener error]: name: {} - from: {} - error: {:?}",
+                                        frontend_name, peer_addr, err
+                                    )
+                                }
                             }
                         });
                     }

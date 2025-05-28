@@ -72,3 +72,8 @@ pub struct ProxyConfig {
 
 pub type GenericError = Box<dyn Error + Send + Sync + 'static>;
 pub type GenericResult<T> = Result<T, GenericError>;
+
+pub enum ApiOjectTypes {
+    PoolServers,
+    PoolBackend,
+}
