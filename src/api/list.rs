@@ -7,15 +7,16 @@ use std::{convert::Infallible, sync::Arc};
 
 use crate::structs::{ApiOjectTypes, ProxyConfig};
 
-pub async fn list_config_object(
+pub async fn api_list_config_object(
     object_type: ApiOjectTypes,
     config: Arc<ArcSwap<ProxyConfig>>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     let config =
         <Arc<ArcSwapAny<Arc<ProxyConfig>>> as arc_swap::access::Access<ProxyConfig>>::load(&config);
     let body = match object_type {
-        ApiOjectTypes::PoolServers => json!({"servers":config.pool_servers}).to_string(),
-        ApiOjectTypes::PoolBackend => json!({"servers":config.pool_backends}).to_string(),
+        ApiOjectTypes::PoolServers => json!({"pool_servers":config.pool_servers}).to_string(),
+        ApiOjectTypes::PoolBackends => json!({"pool_backends":config.pool_backends}).to_string(),
+        ApiOjectTypes::Frontends => json!({"frontends":config.frontends}).to_string(),
     };
     //println!("body: {:?}", body);
     let mut response = Response::new(Full::new(Bytes::from(body)));

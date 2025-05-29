@@ -25,5 +25,12 @@ pub const INTERNAL_ROUTE_MAKE_WEBSOCKET: &str = "_internal_server/websocket";
 pub const SECRET_WS_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 // API Rest
-pub const API_SERVERS_LIST: &str = "list/servers";
+pub const API_FRONTENDS_LIST: &str = "list/frontends";
 pub const API_BACKENDS_LIST: &str = "list/backends";
+pub const API_SERVERS_LIST: &str = "list/servers";
+
+pub const API_SERVERS_ACTIVE: &str = "server/active";
+
+// Json response
+pub const JSON_STATUS_LABEL_SUCCESS: &str = "success";
+pub const JSON_STATUS_LABEL_ERROR: &str = "error";

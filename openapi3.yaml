@@ -1,0 +1,260 @@
+openapi: 3.0.4
+info:
+  title: http_reverse_proxy - OpenAPI 3.0
+  description: |-
+    API Rest endpoint to manage http_reverse_proxy
+  license:
+    name: MIT
+    url: https://github.com/dhenry123/http_reverse_proxy/blob/main/LICENSE.txt
+  version: 0.1.0
+externalDocs:
+  description: Find out more about http_reverse_proxy
+  url: https://github.com/dhenry123/http_reverse_proxy
+servers:
+  - url: https://localhost:27001/api/v1
+tags:
+  - name: list
+    description: Get the list of objects contained in the configuration
+    externalDocs:
+      description: Find out more
+      url: https://github.com/dhenry123/http_reverse_proxy
+  - name: server
+    description: backer server management
+    externalDocs:
+      description: Find out more
+      url: https://github.com/dhenry123/http_reverse_proxy
+paths:
+  /list/frontends:
+    get:
+      tags:
+        - list
+      summary: Get the list of frontends.
+      operationId: listFrontends
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FrontendsList"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - api_key: []
+  /list/backends:
+    get:
+      tags:
+        - list
+      summary: Get the list of backends.
+      operationId: listBackends
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackendsList"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - api_key: []
+  /list/servers:
+    get:
+      tags:
+        - list
+      summary: Get the list of servers.
+      operationId: listServers
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServersList"
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - api_key: []
+  /server/active:
+    put:
+      tags:
+        - server
+      summary: set the active state
+      operationId: serverActive
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/body_server_active"
+        required: true
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/responseServerActive"
+        "400":
+          description: Invalid input
+        "422":
+          description: Validation exception
+        default:
+          description: Unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      security:
+        - api_key: []
+
+components:
+  schemas:
+    body_server_active:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Server name"
+        active:
+          type: boolean
+          description: "active attribut state"
+    responseServerActive:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            server:
+              $ref: "#/components/schemas/server"
+        message:
+          type: string
+        status:
+          type: string
+        timestamp:
+          format: date-time
+          description: UTC timestamp rfc3339 format
+          example: "2025-05-29T19:30:18.230555584Z"
+    acls:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "acl name"
+        host:
+          type: string
+          description: "domain to serve"
+        backend:
+          type: string
+          description: "backend naem"
+        antibot:
+          type: boolean
+          description: "when acl needs to apply antibot method"
+    frontend:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "frontend name"
+        addr:
+          type: string
+          description: "listening ip address"
+          example: "0.0.0.0"
+        port:
+          type: string
+          description: "listening ip port"
+          example: "443"
+        protocol:
+          type: string
+          enum:
+            - http
+            - tcp
+          example: "http"
+        tls:
+          type: boolean
+          description: "Is listener TLS ?"
+        active:
+          type: boolean
+          description: "Is listener active ?"
+        acls:
+          type: array
+          items:
+            $ref: "#/components/schemas/acls"
+    backend:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "localhost"
+        servers:
+          type: array
+          items:
+            type: string
+            example: "server name"
+    server:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "localhost"
+        host:
+          type: string
+          example: "192.168.1.1"
+        port:
+          type: integer
+          format: int32
+          example: 52300
+        protocol:
+          type: string
+          enum:
+            - http
+            - tcp
+          example: "http"
+        tls:
+          type: boolean
+        active:
+          type: boolean
+    ServersList:
+      type: object
+      properties:
+        servers:
+          type: array
+          items:
+            $ref: "#/components/schemas/server"
+    BackendsList:
+      type: object
+      properties:
+        servers:
+          type: array
+          items:
+            $ref: "#/components/schemas/backend"
+    FrontendsList:
+      type: object
+      properties:
+        frontends:
+          type: array
+          items:
+            $ref: "#/components/schemas/frontend"
+    Error:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+  securitySchemes:
+    api_key:
+      type: apiKey
+      name: api_key
+      in: header

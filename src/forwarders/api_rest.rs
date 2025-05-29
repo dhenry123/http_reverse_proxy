@@ -1,19 +1,19 @@
 use arc_swap::ArcSwap;
 use bytes::Bytes;
-use http_body_util::Full;
+use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 
 use crate::{
-    api::list::list_config_object,
-    constants::{API_BACKENDS_LIST, API_SERVERS_LIST},
+    api::{list::api_list_config_object, server::api_server_active_set},
+    constants::{API_BACKENDS_LIST, API_FRONTENDS_LIST, API_SERVERS_ACTIVE, API_SERVERS_LIST},
     structs::{ApiOjectTypes, GenericError, ProxyConfig},
 };
 
 async fn backend_service(
-    req: Request<impl hyper::body::Body>,
+    req: Request<hyper::body::Incoming>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     let config = req
         .extensions()
@@ -22,17 +22,34 @@ async fn backend_service(
         .unwrap()
         .clone();
 
-    let (parts, _body) = req.into_parts();
+    let (parts, body) = req.into_parts();
+
+    //Collect body if provided
+    let body_bytes: Option<Bytes> = match body.boxed().collect().await {
+        Ok(collected_body) => Some(collected_body.to_bytes()),
+        Err(_) => None,
+    };
+
+    println!("parts: {:?}", parts);
+    println!("query: {:?}", parts.uri.query());
     println!("route : {:?}", parts.uri);
     match (parts.clone().method, parts.uri.path()) {
         // List
-        // ---> servers
-        (Method::GET, path) if path.starts_with(format!("/{}", API_SERVERS_LIST,).as_str()) => {
-            Ok(list_config_object(ApiOjectTypes::PoolServers, config.clone()).await?)
+        // ---> frontends
+        (Method::GET, path) if path.starts_with(format!("/{}", API_FRONTENDS_LIST,).as_str()) => {
+            Ok(api_list_config_object(ApiOjectTypes::Frontends, config.clone()).await?)
         }
         // ---> backends
         (Method::GET, path) if path.starts_with(format!("/{}", API_BACKENDS_LIST,).as_str()) => {
-            Ok(list_config_object(ApiOjectTypes::PoolBackend, config.clone()).await?)
+            Ok(api_list_config_object(ApiOjectTypes::PoolBackends, config.clone()).await?)
+        }
+        // ---> servers
+        (Method::GET, path) if path.starts_with(format!("/{}", API_SERVERS_LIST,).as_str()) => {
+            Ok(api_list_config_object(ApiOjectTypes::PoolServers, config.clone()).await?)
+        }
+        // ---> test
+        (Method::PUT, path) if path.starts_with(format!("/{}", API_SERVERS_ACTIVE,).as_str()) => {
+            Ok(api_server_active_set(config.clone(), body_bytes).await?)
         }
         // else
         _ => Ok(super::internal_http::internal_error(

@@ -75,5 +75,6 @@ pub type GenericResult<T> = Result<T, GenericError>;
 
 pub enum ApiOjectTypes {
     PoolServers,
-    PoolBackend,
+    PoolBackends,
+    Frontends,
 }

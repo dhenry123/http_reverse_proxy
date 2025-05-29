@@ -14,8 +14,8 @@ opt-level = 3  # Release (fast runtime)
 hyper = { version = "1.6.0", features = ["full"] }
 hyper-tls = "0"
 http-body-util = "0.1"
-hyper-util = { version = "0.1.12", features = ["full"] }
-tokio = { version = "1.44.2", features = ["full"] }
+hyper-util = { version = "0.1.13", features = ["full"] }
+tokio = { version = "1.45.1", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.140"
 futures = "0.3.31"
@@ -32,15 +32,18 @@ futures-util = "0.3"
 sha1 = "0.10"
 base64 = "0.22"
 ## Configuration
-serde_yaml = "0.9"
+serde_yaml = "0.9.34-deprecated"
 tempfile = "3"
 ## antibot
-uuid = { version = "1.16.0", features = ["v4", "std"] }
+uuid = { version = "1.17.0", features = ["v4", "std"] }
 ## config
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.5.39", features = ["derive"] }
 cookie = "0.18.1"
 ## Self signed certificates
 rcgen = "0.13"
+## API REST
+simd-json = { version = "0.15.1", features = ["serde"] }
+chrono = "0.4.31"
 
 [dev-dependencies]
 tempfile = "3.20"
