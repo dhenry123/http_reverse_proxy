@@ -61,7 +61,7 @@ const fn default_version() -> u64 {
     0 // Your default value
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProxyConfig {
     pub frontends: Vec<FrontEnd>,
     pub pool_backends: Vec<Backend>,

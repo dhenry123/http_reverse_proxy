@@ -1,22 +1,19 @@
-use arc_swap::ArcSwapAny;
 use hyper::{Request, server::conn::http1, service::service_fn};
 
 use hyper_util::rt::{TokioIo, TokioTimer};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{net::TcpListener, time::Instant};
+use tokio::{net::TcpListener, sync::RwLock};
 use tokio_rustls::TlsAcceptor;
 
 use crate::{
+    config_manager::ConfigManager,
     forwarders::{forwarder_handler::handle_request, forwarder_helper::get_http_client},
-    structs::{GenericError, ProxyConfig},
+    structs::GenericError,
 };
 
-use super::servers_tracker::ServerTracker;
-
 pub async fn proxy_from_https(
-    config: Arc<ArcSwapAny<Arc<ProxyConfig>>>,
+    config_manager: Arc<RwLock<ConfigManager>>,
     tls_acceptor: TlsAcceptor,
-    servers_tracker: Arc<arc_swap::ArcSwapAny<Arc<ServerTracker>>>,
     frontend_name: String,
     addr: SocketAddr,
 ) -> Result<(), GenericError> {
@@ -47,8 +44,12 @@ pub async fn proxy_from_https(
                 let svc = {
                     // Clone the values we need to move into the closure
                     let client = client.clone();
-                    let servers_tracker = servers_tracker.clone();
-                    let config = config.clone();
+                    let servers_tracker = config_manager
+                        .read()
+                        .await
+                        .get_tracker(frontend_name.clone())
+                        .unwrap();
+                    let config = config_manager.clone();
                     let frontend_name = frontend_name.clone();
                     // Create the service_fn
                     service_fn(move |mut req: Request<hyper::body::Incoming>| {
@@ -63,13 +64,11 @@ pub async fn proxy_from_https(
                         handle_request(req)
                     })
                 };
-                let start = Instant::now();
                 let tls_acceptor = tls_acceptor.clone();
                 // connection accepted - let's check tls and continue if ok
                 let frontend_name = frontend_name.clone();
                 match tls_acceptor.accept(tcp).await {
                     Ok(tls_stream) => {
-                        //println!("TLS handshake succeeded in {:?}", start.elapsed());
                         // Handle the connection
                         let io = TokioIo::new(tls_stream);
                         let svc = svc.clone();
@@ -93,12 +92,7 @@ pub async fn proxy_from_https(
                         });
                     }
                     Err(e) => {
-                        eprintln!(
-                            "TLS failed after {:?}: {} - peer: {}",
-                            start.elapsed(),
-                            e,
-                            peer_addr
-                        );
+                        eprintln!("TLS failed: {} - peer: {}", e, peer_addr);
                         if let Some(inner) = e.get_ref() {
                             eprintln!("Root cause: {:?}", inner.source());
                         }

@@ -1,12 +1,7 @@
 use std::{
     collections::HashMap,
-    sync::{
-        Arc,
-        atomic::{AtomicUsize, Ordering},
-    },
+    sync::atomic::{AtomicUsize, Ordering},
 };
-
-use arc_swap::ArcSwap;
 
 use crate::structs::{BackendServer, ProxyConfig};
 
@@ -37,19 +32,8 @@ impl ServerTracker {
         }
     }
 
-    // pub fn get_first_backend(&self, host: &str) -> Option<BackendServer> {
-    //     self.backends.get(host).and_then(|(servers, _)| {
-    //         servers.first().cloned() // Always returns first server
-    //     })
-    // }
-
-    /**
-     * Build structure servers_tracker
-     * Server tracker table is set per frontend_name
-     * ([domain/path],[server1,server2,...]
-     */
-    pub fn populate(&mut self, frontend_name: String, config: Arc<ArcSwap<ProxyConfig>>) {
-        let cfg = config.load().clone();
+    pub fn populate(&mut self, frontend_name: String, config: &ProxyConfig) {
+        let cfg = config;
         // get backends
         let pool_lookup: HashMap<_, _> = cfg
             .pool_backends

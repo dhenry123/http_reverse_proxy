@@ -1,20 +1,17 @@
-use arc_swap::ArcSwap;
 use hyper::{Request, server::conn::http1, service::service_fn};
 
 use hyper_util::rt::{TokioIo, TokioTimer};
 use std::{net::SocketAddr, sync::Arc};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::RwLock};
 
 use crate::{
+    config_manager::ConfigManager,
     forwarders::{forwarder_handler::handle_request, forwarder_helper::get_http_client},
-    structs::{GenericError, ProxyConfig},
+    structs::GenericError,
 };
 
-use super::servers_tracker::ServerTracker;
-
 pub async fn proxy_from_http(
-    config: Arc<ArcSwap<ProxyConfig>>,
-    servers_tracker: Arc<arc_swap::ArcSwapAny<Arc<ServerTracker>>>,
+    config_manager: Arc<RwLock<ConfigManager>>,
     frontend_name: String,
     addr: SocketAddr,
 ) -> Result<(), GenericError> {
@@ -33,8 +30,12 @@ pub async fn proxy_from_http(
                 let svc = {
                     // Clone the values we need to move into the closure
                     let client = client.clone();
-                    let servers_tracker = servers_tracker.clone();
-                    let config = config.clone();
+                    let servers_tracker = config_manager
+                        .read()
+                        .await
+                        .get_tracker(frontend_name.clone())
+                        .unwrap();
+                    let config = config_manager.clone();
                     let frontend_name = frontend_name.clone();
                     // Create the service_fn
                     service_fn(move |mut req: Request<hyper::body::Incoming>| {

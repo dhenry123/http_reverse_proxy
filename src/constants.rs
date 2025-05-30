@@ -1,5 +1,5 @@
 // Backend
-pub const POOL_MAX_IDLE_PER_HOST: usize = 250;
+pub const POOL_MAX_IDLE_PER_HOST: usize = 50;
 pub const POOL_IDLE_TIMEOUT: u64 = 60;
 
 // Config default

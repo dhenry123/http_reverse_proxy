@@ -1,48 +1,56 @@
 use std::{convert::Infallible, sync::Arc};
 
-use arc_swap::{ArcSwap, ArcSwapAny};
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode, header::HeaderValue};
 use serde_json::json;
+use tokio::sync::RwLock;
 
-use crate::structs::{GenericError, ProxyConfig};
+use crate::{config_manager::ConfigManager, structs::GenericError};
 
 use super::{
     body_json_structs::BodyServerActive, json_body::extract_json_body, json_reponse::JsonResponse,
 };
 
 pub async fn api_server_active_set(
-    config: Arc<ArcSwap<ProxyConfig>>,
+    config_manager: Arc<RwLock<ConfigManager>>,
     body_bytes: Option<Bytes>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     let mut response = Response::new(Full::new(Bytes::from("")));
 
     let mut body: String = "".to_string();
     let mut status_code = StatusCode::BAD_REQUEST;
+    // Get write lock (async)
+    let mut config_manager = config_manager.write().await;
+
+    // payload is provided
     if body_bytes.is_some() {
         //Try to get payload
         let request: Result<BodyServerActive, GenericError> =
             extract_json_body(body_bytes.unwrap()).await;
         match request {
             Ok(request) => {
-                // Try to update current config
-                let shared_config =
-                <Arc<ArcSwapAny<Arc<ProxyConfig>>> as arc_swap::access::Access<ProxyConfig>>::load(&config);
-                let mut new_config: ProxyConfig = shared_config.clone();
-                let mut server_state: Option<crate::structs::BackendServer> = None; // Will store the modified server if found
-                for server in &mut new_config.pool_servers {
+                // Try to update current config (pool_servers)
+                let proxyconfig = config_manager.get_config().await;
+                let mut updated_server: Option<crate::structs::BackendServer> = None; // Will store the modified server if found
+                let mut new_servers = proxyconfig.pool_servers.clone();
+                for server in &mut new_servers {
                     if server.name == request.name {
                         server.active = request.active;
-                        server_state = Some(server.clone());
+                        updated_server = Some(server.clone());
                         break;
                     }
                 }
                 // set body response
-                body = match server_state {
+                body = match updated_server {
                     Some(server) => {
                         // Store changes
-                        config.store(Arc::new(new_config.clone()));
+                        // Create a mutable copy of the config
+                        let mut new_config = (*proxyconfig).clone();
+                        new_config.pool_servers = new_servers;
+                        config_manager.set_config(new_config.into()).await;
+
+                        //config.store(Arc::new(new_config.clone()));
                         status_code = StatusCode::OK;
                         JsonResponse::success(format!(
                             "Server {} active state set to {}",

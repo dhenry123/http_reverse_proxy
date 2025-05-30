@@ -1,4 +1,3 @@
-use arc_swap::{ArcSwap, ArcSwapAny};
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode, header::HeaderValue};
@@ -9,16 +8,14 @@ use crate::structs::{ApiOjectTypes, ProxyConfig};
 
 pub async fn api_list_config_object(
     object_type: ApiOjectTypes,
-    config: Arc<ArcSwap<ProxyConfig>>,
+    config: Arc<ProxyConfig>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
-    let config =
-        <Arc<ArcSwapAny<Arc<ProxyConfig>>> as arc_swap::access::Access<ProxyConfig>>::load(&config);
     let body = match object_type {
         ApiOjectTypes::PoolServers => json!({"pool_servers":config.pool_servers}).to_string(),
         ApiOjectTypes::PoolBackends => json!({"pool_backends":config.pool_backends}).to_string(),
         ApiOjectTypes::Frontends => json!({"frontends":config.frontends}).to_string(),
     };
-    //println!("body: {:?}", body);
+    // Building response
     let mut response = Response::new(Full::new(Bytes::from(body)));
     response.headers_mut().append(
         hyper::http::header::CONTENT_TYPE,

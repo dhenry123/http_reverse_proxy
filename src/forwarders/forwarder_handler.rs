@@ -1,4 +1,3 @@
-use arc_swap::ArcSwap;
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{
@@ -13,9 +12,11 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::RwLock;
 use tokio_tungstenite::tungstenite::http;
 
 use crate::{
+    config_manager::ConfigManager,
     constants::{
         HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP, INTERNAL_ROUTE_ANTIBOT,
         INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
@@ -25,7 +26,6 @@ use crate::{
         forwarder_ws::handle_websocket_upgrade,
     },
     internal_server_free_port,
-    structs::ProxyConfig,
 };
 
 use super::{
@@ -77,21 +77,21 @@ pub async fn handle_request(
 
     let servers_tracker = req
         .extensions()
-        .get::<Arc<arc_swap::ArcSwapAny<Arc<ServerTracker>>>>()
+        .get::<Arc<ServerTracker>>()
         .cloned()
         .unwrap()
         .clone();
 
     let config = req
         .extensions()
-        .get::<Arc<ArcSwap<ProxyConfig>>>()
+        .get::<Arc<RwLock<ConfigManager>>>()
         .cloned()
         .unwrap()
         .clone();
 
     if is_websocket_request(&req) {
         println!("websocket request detected");
-        return handle_websocket_upgrade(req, servers_tracker).await;
+        return handle_websocket_upgrade(req, &servers_tracker).await;
     }
 
     let client = req
@@ -116,10 +116,11 @@ pub async fn handle_request(
         frontend_name.clone(),
         original_host.clone(),
         config.clone(),
-    );
+    )
+    .await;
 
     // upstream uri
-    let mut upstream_uri = get_upstream_uri(original_host.clone(), servers_tracker.clone(), false);
+    let mut upstream_uri = get_upstream_uri(original_host.clone(), &servers_tracker, false);
     if upstream_uri == "" {
         // Internal server - No server available
         upstream_uri = get_internal_error_no_backend_server_available_uri(parts.clone());

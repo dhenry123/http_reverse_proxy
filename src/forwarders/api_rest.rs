@@ -1,27 +1,29 @@
-use arc_swap::ArcSwap;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::RwLock};
 
 use crate::{
     api::{list::api_list_config_object, server::api_server_active_set},
+    config_manager::ConfigManager,
     constants::{API_BACKENDS_LIST, API_FRONTENDS_LIST, API_SERVERS_ACTIVE, API_SERVERS_LIST},
-    structs::{ApiOjectTypes, GenericError, ProxyConfig},
+    structs::{ApiOjectTypes, GenericError},
 };
 
 async fn backend_service(
     req: Request<hyper::body::Incoming>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
-    let config = req
+    //let peer_addr = req.extensions().get::<SocketAddr>().cloned().unwrap();
+    let config_manager = req
         .extensions()
-        .get::<Arc<ArcSwap<ProxyConfig>>>()
+        .get::<Arc<RwLock<ConfigManager>>>()
         .cloned()
         .unwrap()
         .clone();
 
+    let proxy_config = config_manager.read().await.get_config().await;
     let (parts, body) = req.into_parts();
 
     //Collect body if provided
@@ -37,19 +39,19 @@ async fn backend_service(
         // List
         // ---> frontends
         (Method::GET, path) if path.starts_with(format!("/{}", API_FRONTENDS_LIST,).as_str()) => {
-            Ok(api_list_config_object(ApiOjectTypes::Frontends, config.clone()).await?)
+            Ok(api_list_config_object(ApiOjectTypes::Frontends, proxy_config).await?)
         }
         // ---> backends
         (Method::GET, path) if path.starts_with(format!("/{}", API_BACKENDS_LIST,).as_str()) => {
-            Ok(api_list_config_object(ApiOjectTypes::PoolBackends, config.clone()).await?)
+            Ok(api_list_config_object(ApiOjectTypes::PoolBackends, proxy_config).await?)
         }
         // ---> servers
         (Method::GET, path) if path.starts_with(format!("/{}", API_SERVERS_LIST,).as_str()) => {
-            Ok(api_list_config_object(ApiOjectTypes::PoolServers, config.clone()).await?)
+            Ok(api_list_config_object(ApiOjectTypes::PoolServers, proxy_config).await?)
         }
         // ---> test
         (Method::PUT, path) if path.starts_with(format!("/{}", API_SERVERS_ACTIVE,).as_str()) => {
-            Ok(api_server_active_set(config.clone(), body_bytes).await?)
+            Ok(api_server_active_set(config_manager.clone(), body_bytes).await?)
         }
         // else
         _ => Ok(super::internal_http::internal_error(
@@ -63,7 +65,7 @@ async fn backend_service(
 pub async fn apirest_http(
     name: String,
     addr: SocketAddr,
-    config: Arc<ArcSwap<ProxyConfig>>,
+    config_manager: Arc<tokio::sync::RwLock<ConfigManager>>,
 ) -> Result<(), GenericError> {
     println!("API REST HTTP listener: {} is listening on: {}", name, addr);
 
@@ -72,13 +74,14 @@ pub async fn apirest_http(
     loop {
         match listener.accept().await {
             Ok((tcp, peer_addr)) => {
+                let config_manager = config_manager.clone();
                 let svc = {
-                    // Clone the values we need to move into the closure
-                    let config = config.clone();
+                    // Clone again for the service_fn
+                    let config_manager = Arc::clone(&config_manager);
                     // Create the service_fn
                     service_fn(move |mut req: Request<hyper::body::Incoming>| {
                         // Insert extensions
-                        req.extensions_mut().insert(config.clone());
+                        req.extensions_mut().insert(config_manager.clone());
                         req.extensions_mut().insert(peer_addr);
                         // Call the handler - no async/await here!
                         backend_service(req)

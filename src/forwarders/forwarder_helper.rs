@@ -1,6 +1,5 @@
 use std::{collections::HashMap, error::Error, fs, path::PathBuf, sync::Arc, time::Duration};
 
-use arc_swap::{ArcSwap, ArcSwapAny};
 use hyper::{Request, body, header::HeaderValue};
 use hyper_tls::HttpsConnector;
 use hyper_util::{
@@ -10,11 +9,13 @@ use hyper_util::{
 use rustls::{ServerConfig, crypto::aws_lc_rs::sign::any_supported_type, sign::CertifiedKey};
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
+    config_manager::ConfigManager,
     constants::{ANTIBOT_COOKIE_NAME, POOL_IDLE_TIMEOUT, POOL_MAX_IDLE_PER_HOST},
-    structs::{BackendServer, GenericError, GenericResult, ProxyConfig},
+    structs::{BackendServer, GenericError, GenericResult},
 };
 
 use super::servers_tracker::ServerTracker;
@@ -146,8 +147,7 @@ pub fn get_http_client() -> Client<hyper_tls::HttpsConnector<HttpConnector>, bod
     let https_connector = HttpsConnector::new();
 
     Client::builder(TokioExecutor::new())
-        // .pool_max_idle_per_host(POOL_MAX_IDLE_PER_HOST)
-        .pool_max_idle_per_host(50)
+        .pool_max_idle_per_host(POOL_MAX_IDLE_PER_HOST)
         .pool_idle_timeout(Duration::from_secs(POOL_IDLE_TIMEOUT))
         .http1_preserve_header_case(true)
         .pool_timer(TokioTimer::new())
@@ -160,14 +160,11 @@ pub fn get_http_client() -> Client<hyper_tls::HttpsConnector<HttpConnector>, bod
  */
 pub fn get_upstream_uri(
     original_host: String,
-    servers_tracker: Arc<ArcSwapAny<Arc<ServerTracker>>>,
+    servers_tracker: &Arc<ServerTracker>,
     is_web_socket: bool,
 ) -> String {
     // Which backend ?
-    let backend_server = servers_tracker
-        .load()
-        .as_ref()
-        .get_next_backend(&original_host);
+    let backend_server = servers_tracker.get_next_backend(&original_host);
     //println!("backend_server: {:?}", backend_server);
     if backend_server.is_some() {
         build_upstream_uri(backend_server.unwrap(), is_web_socket)
@@ -179,20 +176,21 @@ pub fn get_upstream_uri(
 /**
  * Browser config to look for frontend/host is set with antibot
  */
-pub fn is_domain_configured_for_antibot(
+pub async fn is_domain_configured_for_antibot(
     frontend_name: String,
     original_host: String,
-    config: Arc<ArcSwap<ProxyConfig>>,
+    config_manager: Arc<RwLock<ConfigManager>>,
 ) -> bool {
-    let config = config.clone().load();
-    let lookup_table = config
+    let lookup_table = config_manager
         // filter frontend on frontend_name
-        .frontends
-        .iter()
+        .read()
+        .await
+        .get_frontends()
+        .into_iter()
         .find(|f| f.name == frontend_name)
         // Get acls
         .into_iter()
-        .flat_map(|frontend| &frontend.acls)
+        .flat_map(|frontend| frontend.acls)
         .find(|a| a.host == original_host)
         .into_iter()
         .collect::<Vec<_>>();

@@ -1,5 +1,3 @@
-use arc_swap::ArcSwap;
-
 use futures::Sink;
 use futures_util::{SinkExt, stream::StreamExt};
 use hyper::{Method, Request, Response, Uri, body};
@@ -23,7 +21,7 @@ use super::{
 
 pub async fn handle_websocket_upgrade(
     mut req: Request<hyper::body::Incoming>,
-    servers_tracker: Arc<ArcSwap<ServerTracker>>,
+    servers_tracker: &Arc<ServerTracker>,
 ) -> Result<Response<body::Incoming>, hyper_util::client::legacy::Error> {
     let upgraded_fut = hyper::upgrade::on(&mut req);
 
@@ -35,7 +33,7 @@ pub async fn handle_websocket_upgrade(
         .map(|s| s.to_string())
         .unwrap(); // Convert to &str safely
 
-    let upstream_uri = get_upstream_uri(original_host.clone(), servers_tracker.clone(), true)
+    let upstream_uri = get_upstream_uri(original_host.clone(), &servers_tracker, true)
         .parse::<Uri>()
         .unwrap();
 
