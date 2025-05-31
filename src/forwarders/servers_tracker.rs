@@ -22,9 +22,12 @@ impl ServerTracker {
      */
     pub fn get_next_backend(&self, host: &str) -> Option<BackendServer> {
         // Get natural next backend
-        self.backends.get(host).map(|(servers, idx)| {
+        self.backends.get(host).and_then(|(servers, idx)| {
+            if servers.is_empty() {
+                return None;
+            }
             let next_idx = idx.fetch_add(1, Ordering::Relaxed);
-            servers[next_idx % servers.len()].clone()
+            Some(servers[next_idx % servers.len()].clone())
         })
     }
 
