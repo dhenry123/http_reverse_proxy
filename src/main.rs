@@ -6,10 +6,10 @@ mod html;
 mod internal_server_free_port;
 mod structs;
 
+use api::api_rest::apirest_http;
 use clap::Parser;
 use config_manager::{Args, ConfigManager};
 use constants::API_LISTENING_PORT;
-use forwarders::api_rest::apirest_http;
 use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
 use forwarders::internal_http::internal_http;

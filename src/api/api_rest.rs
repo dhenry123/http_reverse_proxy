@@ -8,7 +8,10 @@ use tokio::{net::TcpListener, sync::RwLock};
 use crate::{
     api::{list::api_list_config_object, server::api_server_active_set},
     config_manager::ConfigManager,
-    constants::{API_BACKENDS_LIST, API_FRONTENDS_LIST, API_SERVERS_ACTIVE, API_SERVERS_LIST},
+    constants::{
+        API_BACKENDS_LIST, API_FRONTENDS_LIST, API_SERVERS_ACTIVE, API_SERVERS_LIST, API_VERSION,
+    },
+    forwarders::internal_http::{InternalServerErrors, internal_error},
     structs::{ApiOjectTypes, GenericError},
 };
 
@@ -38,27 +41,31 @@ async fn backend_service(
     match (parts.clone().method, parts.uri.path()) {
         // List
         // ---> frontends
-        (Method::GET, path) if path.starts_with(format!("/{}", API_FRONTENDS_LIST,).as_str()) => {
+        (Method::GET, path)
+            if path.starts_with(format!("/{}/{}", API_VERSION, API_FRONTENDS_LIST,).as_str()) =>
+        {
             Ok(api_list_config_object(ApiOjectTypes::Frontends, proxy_config).await?)
         }
         // ---> backends
-        (Method::GET, path) if path.starts_with(format!("/{}", API_BACKENDS_LIST,).as_str()) => {
+        (Method::GET, path)
+            if path.starts_with(format!("/{}/{}", API_VERSION, API_BACKENDS_LIST,).as_str()) =>
+        {
             Ok(api_list_config_object(ApiOjectTypes::PoolBackends, proxy_config).await?)
         }
         // ---> servers
-        (Method::GET, path) if path.starts_with(format!("/{}", API_SERVERS_LIST,).as_str()) => {
+        (Method::GET, path)
+            if path.starts_with(format!("/{}/{}", API_VERSION, API_SERVERS_LIST,).as_str()) =>
+        {
             Ok(api_list_config_object(ApiOjectTypes::PoolServers, proxy_config).await?)
         }
         // ---> test
-        (Method::PUT, path) if path.starts_with(format!("/{}", API_SERVERS_ACTIVE,).as_str()) => {
+        (Method::PUT, path)
+            if path.starts_with(format!("/{}/{}", API_VERSION, API_SERVERS_ACTIVE,).as_str()) =>
+        {
             Ok(api_server_active_set(config_manager.clone(), body_bytes).await?)
         }
         // else
-        _ => Ok(super::internal_http::internal_error(
-            super::internal_http::InternalServerErrors::RouteNotFound,
-            parts,
-        )
-        .await?),
+        _ => Ok(internal_error(InternalServerErrors::RouteNotFound, parts).await?),
     }
 }
 
