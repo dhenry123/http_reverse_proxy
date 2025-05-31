@@ -17,19 +17,15 @@ impl ServerTracker {
         }
     }
 
+    /**
+     * Warning: modifying this method could lead to a bottleneck
+     */
     pub fn get_next_backend(&self, host: &str) -> Option<BackendServer> {
         // Get natural next backend
-        let final_server = self.backends.get(host).map(|(servers, idx)| {
+        self.backends.get(host).map(|(servers, idx)| {
             let next_idx = idx.fetch_add(1, Ordering::Relaxed);
-            let server = servers[next_idx % servers.len()].clone();
-            server
-        });
-        // if server, check is active?
-        if final_server.is_some() && !final_server.clone().unwrap().active {
-            None
-        } else {
-            final_server
-        }
+            servers[next_idx % servers.len()].clone()
+        })
     }
 
     pub fn populate(&mut self, frontend_name: String, config: &ProxyConfig) {
@@ -56,7 +52,7 @@ impl ServerTracker {
                         acl.host.clone(),
                         cfg.pool_servers
                             .iter()
-                            .filter(|server| servers.contains(&server.name))
+                            .filter(|server| servers.contains(&server.name) && server.active)
                             .cloned()
                             .collect::<Vec<_>>(),
                     )

@@ -13,9 +13,9 @@ use crate::{
 
 pub async fn proxy_from_https(
     config_manager: Arc<RwLock<ConfigManager>>,
-    tls_acceptor: TlsAcceptor,
     frontend_name: String,
     addr: SocketAddr,
+    tls_acceptor: TlsAcceptor,
 ) -> Result<(), GenericError> {
     let client = get_http_client();
 

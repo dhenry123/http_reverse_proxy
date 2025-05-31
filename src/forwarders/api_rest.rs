@@ -63,11 +63,14 @@ async fn backend_service(
 }
 
 pub async fn apirest_http(
-    name: String,
-    addr: SocketAddr,
     config_manager: Arc<tokio::sync::RwLock<ConfigManager>>,
+    frontend_name: String,
+    addr: SocketAddr,
 ) -> Result<(), GenericError> {
-    println!("API REST HTTP listener: {} is listening on: {}", name, addr);
+    println!(
+        "API REST HTTP listener: {} is listening on: {}",
+        frontend_name, addr
+    );
 
     let listener = TcpListener::bind(addr).await?;
 
