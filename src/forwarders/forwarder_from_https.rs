@@ -1,7 +1,7 @@
 use hyper::{Request, server::conn::http1, service::service_fn};
 
 use hyper_util::rt::{TokioIo, TokioTimer};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{error::Error, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::RwLock};
 use tokio_rustls::TlsAcceptor;
 
@@ -48,20 +48,22 @@ pub async fn proxy_from_https(
                         .read()
                         .await
                         .get_tracker(frontend_name.clone())
-                        .unwrap();
-                    let config = config_manager.clone();
+                        .ok_or(Box::<dyn Error + Send + Sync + 'static>::from(
+                            "No servers available",
+                        ))?;
+                    let config_manager = config_manager.clone();
                     let frontend_name = frontend_name.clone();
                     // Create the service_fn
-                    service_fn(move |mut req: Request<hyper::body::Incoming>| {
-                        // Insert extensions
-                        req.extensions_mut().insert(frontend_name.clone());
-                        req.extensions_mut().insert(config.clone());
-                        req.extensions_mut().insert(peer_addr);
-                        req.extensions_mut().insert(client.clone());
-                        req.extensions_mut().insert(servers_tracker.clone());
-
+                    service_fn(move |req: Request<hyper::body::Incoming>| {
                         // Call the handler - no async/await here!
-                        handle_request(req)
+                        handle_request(
+                            req,
+                            peer_addr,
+                            frontend_name.clone(),
+                            servers_tracker.clone(),
+                            config_manager.clone(),
+                            client.clone(),
+                        )
                     })
                 };
                 let tls_acceptor = tls_acceptor.clone();

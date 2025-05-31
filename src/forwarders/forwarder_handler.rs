@@ -75,37 +75,16 @@ pub async fn set_response_header(original_host: String, response: &mut Response<
 
 pub async fn handle_request(
     req: Request<hyper::body::Incoming>,
+    peer_addr: SocketAddr,
+    frontend_name: String,
+    servers_tracker: Arc<ServerTracker>,
+    config: Arc<RwLock<ConfigManager>>,
+    client: Client<HttpsConnector<HttpConnector>, Incoming>,
 ) -> Result<Response<body::Incoming>, hyper_util::client::legacy::Error> {
-    // peer address:port
-    let peer_addr = req.extensions().get::<SocketAddr>().cloned().unwrap();
-
-    let frontend_name = req.extensions().get::<String>().cloned().unwrap();
-
-    let servers_tracker = req
-        .extensions()
-        .get::<Arc<ServerTracker>>()
-        .cloned()
-        .unwrap()
-        .clone();
-
-    let config = req
-        .extensions()
-        .get::<Arc<RwLock<ConfigManager>>>()
-        .cloned()
-        .unwrap()
-        .clone();
-
     if is_websocket_request(&req) {
         println!("websocket request detected");
         return handle_websocket_upgrade(req, &servers_tracker).await;
     }
-
-    let client = req
-        .extensions()
-        .get::<Client<HttpsConnector<HttpConnector>, Incoming>>()
-        .cloned()
-        .unwrap()
-        .clone();
 
     let (parts, body) = req.into_parts();
 
