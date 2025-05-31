@@ -4,7 +4,10 @@ use hyper::{Response, StatusCode, header::HeaderValue};
 use serde_json::json;
 use std::{convert::Infallible, sync::Arc};
 
-use crate::structs::{ApiOjectTypes, ProxyConfig};
+use crate::{
+    constants::API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN,
+    structs::{ApiOjectTypes, ProxyConfig},
+};
 
 pub async fn api_list_config_object(
     object_type: ApiOjectTypes,
@@ -20,6 +23,10 @@ pub async fn api_list_config_object(
     response.headers_mut().append(
         hyper::http::header::CONTENT_TYPE,
         HeaderValue::from_str("application/json").unwrap(),
+    );
+    response.headers_mut().append(
+        hyper::http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        HeaderValue::from_str(API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
     );
     // Change http code
     *response.status_mut() = StatusCode::OK;

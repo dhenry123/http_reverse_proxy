@@ -3,6 +3,7 @@ mod config_manager;
 mod constants;
 mod forwarders;
 mod html;
+mod http_response;
 mod internal_server_free_port;
 mod structs;
 

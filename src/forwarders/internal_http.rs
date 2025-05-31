@@ -15,6 +15,7 @@ use crate::{
         INTERNAL_ROUTE_MAKE_WEBSOCKET,
     },
     html::{template_html_antibot, template_html_internal_error},
+    http_response::header::header_add_no_cache,
     structs::GenericError,
 };
 
@@ -51,9 +52,10 @@ pub async fn internal_error(
     let html = template_html_internal_error(error_code, p1, p2, final_path);
     let body = Full::new(Bytes::from(html));
     //println!("body: {:?}", body);
-    let mut response = Response::new(body);
+    let mut response: Response<Full<Bytes>> = Response::new(body);
     // Change http code
     *response.status_mut() = StatusCode::SERVICE_UNAVAILABLE;
+    header_add_no_cache(&mut response);
     Ok(response)
 }
 
@@ -77,6 +79,7 @@ async fn antibot(parts: http::request::Parts) -> Result<Response<Full<Bytes>>, I
             "Set-Cookie",
             HeaderValue::from_str(cookie.to_string().as_str()).unwrap(),
         );
+        header_add_no_cache(&mut response);
     }
     Ok(response)
 }
