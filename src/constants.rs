@@ -25,6 +25,7 @@ pub const INTERNAL_ROUTE_MAKE_WEBSOCKET: &str = "_internal_server/websocket";
 pub const SECRET_WS_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 // API Rest
+pub const API_LISTENING_PORT: u16 = 27001;
 pub const API_FRONTENDS_LIST: &str = "list/frontends";
 pub const API_BACKENDS_LIST: &str = "list/backends";
 pub const API_SERVERS_LIST: &str = "list/servers";

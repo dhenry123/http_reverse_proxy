@@ -158,19 +158,14 @@ pub fn get_http_client() -> Client<hyper_tls::HttpsConnector<HttpConnector>, bod
 /**
  * return the final uri selecting the backend with roundrobin
  */
-pub fn get_upstream_uri(
+pub fn get_upstream_server(
     original_host: String,
     servers_tracker: &Arc<ServerTracker>,
-    is_web_socket: bool,
-) -> String {
+) -> Option<BackendServer> {
     // Which backend ?
     let backend_server = servers_tracker.get_next_backend(&original_host);
     //println!("backend_server: {:?}", backend_server);
-    if backend_server.is_some() {
-        build_upstream_uri(backend_server.unwrap(), is_web_socket)
-    } else {
-        "".to_string()
-    }
+    backend_server
 }
 
 /**

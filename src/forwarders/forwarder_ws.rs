@@ -11,11 +11,12 @@ use tokio_tungstenite::{
 
 use crate::{
     constants::{INTERNAL_ROUTE_MAKE_WEBSOCKET, SECRET_WS_GUID},
+    forwarders::forwarder_helper::build_upstream_uri,
     internal_server_free_port,
 };
 
 use super::{
-    forwarder_helper::{get_http_client, get_upstream_uri},
+    forwarder_helper::{get_http_client, get_upstream_server},
     servers_tracker::ServerTracker,
 };
 
@@ -33,9 +34,12 @@ pub async fn handle_websocket_upgrade(
         .map(|s| s.to_string())
         .unwrap(); // Convert to &str safely
 
-    let upstream_uri = get_upstream_uri(original_host.clone(), &servers_tracker, true)
-        .parse::<Uri>()
-        .unwrap();
+    let upstream_server = get_upstream_server(original_host.clone(), &servers_tracker);
+    let upstream_uri = match upstream_server {
+        Some(server) => build_upstream_uri(server, true),
+        None => "".to_string(),
+    };
+    let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
 
     println!("upstream_uri: {}", upstream_uri);
 

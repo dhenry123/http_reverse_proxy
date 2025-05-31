@@ -1,38 +1,44 @@
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{
-    HeaderMap, Request, Response, Uri,
+    HeaderMap, Method, Request, Response, Uri,
     body::{self, Incoming},
     header::HeaderValue,
 };
 
 use hyper_tls::HttpsConnector;
 use hyper_util::{
-    client::legacy::{Client, connect::HttpConnector},
+    client::legacy::{Client, Error, connect::HttpConnector},
     rt::TokioExecutor,
 };
+use serde_json::json;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tokio_tungstenite::tungstenite::http;
 
 use crate::{
+    api::api_helper::get_api_server_active_set,
     config_manager::ConfigManager,
     constants::{
         HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP, INTERNAL_ROUTE_ANTIBOT,
         INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
     },
     forwarders::{
-        forwarder_helper::{get_upstream_uri, is_domain_configured_for_antibot},
+        forwarder_helper::{get_upstream_server, is_domain_configured_for_antibot},
         forwarder_ws::handle_websocket_upgrade,
     },
     internal_server_free_port,
+    structs::BackendServer,
 };
 
 use super::{
-    forwarder_helper::{is_cookie_antibot, is_websocket_request},
+    forwarder_helper::{build_upstream_uri, is_cookie_antibot, is_websocket_request},
     servers_tracker::ServerTracker,
 };
 
+enum FallBackResponseType {
+    ServerUnavailable,
+}
 /**
  * Alter output header client->listener (Response)
  */
@@ -119,8 +125,12 @@ pub async fn handle_request(
     )
     .await;
 
-    // upstream uri
-    let mut upstream_uri = get_upstream_uri(original_host.clone(), &servers_tracker, false);
+    // upstream uri - server selected (will be desactived if server not available)
+    let upstream_server = get_upstream_server(original_host.clone(), &servers_tracker);
+    let mut upstream_uri = match upstream_server.clone() {
+        Some(server) => build_upstream_uri(server, false),
+        None => "".to_string(),
+    };
     if upstream_uri == "" {
         // Internal server - No server available
         upstream_uri = get_internal_error_no_backend_server_available_uri(parts.clone());
@@ -182,27 +192,67 @@ pub async fn handle_request(
                 "Request forwarding initial error: {:?} - upstream uri: {}",
                 initial_error, upstream_uri
             );
-            // Return internal response unavailable service 503
-            let upstream_uri = get_internal_error_no_backend_server_available_uri(parts.clone());
-            let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
-            let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
-            let response = client.get(upstream_uri).await;
-            match response {
-                Ok(mut response) => {
-                    let original_host = original_host.clone();
-                    set_response_header(original_host, &mut response).await;
-                    Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
+            if initial_error.is_connect() {
+                // upstream serveur failure, server must be desactivated
+                println!("upstream_server failure: {:?}", upstream_server);
+                deactivate_server(upstream_server).await;
+                // Return internal response unavailable service 503
+                match get_fallback_response(parts.clone(), FallBackResponseType::ServerUnavailable)
+                    .await
+                {
+                    Ok(mut response) => {
+                        let original_host = original_host.clone();
+                        set_response_header(original_host, &mut response).await;
+                        Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
+                    }
+                    Err(internal_server_error) => {
+                        eprintln!(
+                            "Error on calling fallback response: {:?}",
+                            internal_server_error
+                        );
+                        Err(initial_error)
+                    }
                 }
-                Err(internal_server_error) => {
-                    eprintln!(
-                        "Request forwarding calling internal server, error: {:?}",
-                        internal_server_error
-                    );
-                    Err(initial_error)
-                }
+            } else {
+                Err(initial_error)
             }
         }
     }
+}
+
+/**
+ * deactivate server
+ */
+async fn deactivate_server(upstream_server: Option<BackendServer>) {
+    if upstream_server.is_some() {
+        let upstream_uri = get_api_server_active_set();
+        let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
+        let url = upstream_uri.parse::<Uri>().unwrap();
+        let authority = url.authority().unwrap().clone();
+        let json: String = json!({
+            "name": upstream_server.unwrap().name,
+            "active": false
+        })
+        .to_string();
+
+        let body = Full::new(Bytes::from(json));
+        let req = Request::builder()
+            .uri(url)
+            .header(hyper::header::HOST, authority.as_str())
+            .method(Method::PUT)
+            .body(body)
+            .unwrap();
+        let _ = client.request(req).await;
+    }
+}
+
+async fn get_fallback_response(
+    parts: http::request::Parts,
+    _all_back_response_type: FallBackResponseType,
+) -> Result<Response<Incoming>, Error> {
+    let upstream_uri = get_internal_error_no_backend_server_available_uri(parts);
+    let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
+    client.get(upstream_uri.parse::<Uri>().unwrap()).await
 }
 
 fn get_internal_antibot_uri() -> String {

@@ -52,6 +52,7 @@ impl ServerTracker {
                         acl.host.clone(),
                         cfg.pool_servers
                             .iter()
+                            // including only active servers
                             .filter(|server| servers.contains(&server.name) && server.active)
                             .cloned()
                             .collect::<Vec<_>>(),

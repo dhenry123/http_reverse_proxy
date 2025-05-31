@@ -8,6 +8,7 @@ mod structs;
 
 use clap::Parser;
 use config_manager::{Args, ConfigManager};
+use constants::API_LISTENING_PORT;
 use forwarders::api_rest::apirest_http;
 use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
@@ -98,7 +99,7 @@ async fn main() -> Result<(), GenericError> {
 
     // API Rest server
     let ipaddr = parse_bind_address("127.0.0.1").unwrap();
-    let frontend_addr = SocketAddr::from((ipaddr, 27001));
+    let frontend_addr = SocketAddr::from((ipaddr, API_LISTENING_PORT));
     let listener: tokio::task::JoinHandle<()>;
     let frontend_name = "APIRest".to_string();
     listener = tokio::spawn(async move {
