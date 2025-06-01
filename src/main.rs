@@ -97,12 +97,7 @@ async fn main() -> Result<(), GenericError> {
     }
 
     // Internal frontend http (hard because i don't know how to implement a fake Response<Incoming> in listeners when backend is disabled
-    let ipaddr = parse_bind_address(
-        env::var("API_LISTENING_ADDR")
-            .as_deref()
-            .unwrap_or(API_LISTENING_ADDR),
-    )
-    .unwrap();
+    let ipaddr = parse_bind_address("127.0.0.1").unwrap();
     let port = internal_server_free_port::init_global_port(23000, 27000);
     let frontend_addr = SocketAddr::from((ipaddr, port));
     let listener: tokio::task::JoinHandle<()>;
@@ -119,7 +114,12 @@ async fn main() -> Result<(), GenericError> {
     listeners.push(listener);
 
     // API Rest server
-    let ipaddr = parse_bind_address("127.0.0.1").unwrap();
+    let ipaddr = parse_bind_address(
+        env::var("API_LISTENING_ADDR")
+            .as_deref()
+            .unwrap_or(API_LISTENING_ADDR),
+    )
+    .unwrap();
     let frontend_addr = SocketAddr::from((ipaddr, API_LISTENING_PORT));
     let listener: tokio::task::JoinHandle<()>;
     let frontend_name = "APIRest".to_string();
