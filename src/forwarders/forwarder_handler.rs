@@ -29,6 +29,7 @@ use crate::{
         forwarder_ws::handle_websocket_upgrade,
     },
     internal_server_free_port,
+    state::AppState,
     structs::BackendServer,
 };
 
@@ -81,6 +82,7 @@ pub async fn handle_request(
     servers_tracker: Arc<ServerTracker>,
     config: Arc<RwLock<ConfigManager>>,
     client: Client<HttpsConnector<HttpConnector>, Incoming>,
+    state: Arc<AppState>,
 ) -> Result<Response<body::Incoming>, hyper_util::client::legacy::Error> {
     if is_websocket_request(&req) {
         debug!("websocket request detected");
@@ -96,6 +98,7 @@ pub async fn handle_request(
         .and_then(|h| h.to_str().ok())
         .map(|s| s.to_string())
         .unwrap(); // Convert to &str safely
+    state.metrics.increment_domain(&original_host);
 
     // Prepare antibot
     let is_antibot_protected = is_domain_configured_for_antibot(
@@ -158,7 +161,7 @@ pub async fn handle_request(
     //====> To check round robin load balance
     debug!("upstream_uri: {}", upstream_uri);
 
-    let forwarded_req = get_forwarded_red(parts.clone(), upstream_uri.clone(), peer_addr, body);
+    let forwarded_req = get_forwarded_req(parts.clone(), upstream_uri.clone(), peer_addr, body);
 
     let response = client.request(forwarded_req).await;
 
@@ -168,6 +171,10 @@ pub async fn handle_request(
             let original_host = original_host.clone();
             set_response_header(original_host, &mut response).await;
             debug!("{:?}", response);
+            state
+                .metrics
+                .increment_server(&upstream_server.clone().unwrap().name);
+
             Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
         }
         Err(initial_error) => {
@@ -259,7 +266,7 @@ fn get_internal_error_no_backend_server_available_uri(parts: http::request::Part
 /**
  * Build forwarded request with all original headers
  */
-fn get_forwarded_red(
+fn get_forwarded_req(
     parts: http::request::Parts,
     upstream_uri: Uri,
     peer_addr: SocketAddr,

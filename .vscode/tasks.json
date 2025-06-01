@@ -28,7 +28,7 @@
       ],
       "options": {
         "env": {
-          "RUST_LOG": "info"
+          "RUST_LOG": "debug"
         }
       },
       "group": {

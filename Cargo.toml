@@ -49,6 +49,8 @@ chrono = "0.4.31"
 log = "0.4"          # Logging facade
 tracing = "0.1"      # Structured, async-friendly logging
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+## statistics
+dashmap = "6"
 
 [dev-dependencies]
 tempfile = "3.20"

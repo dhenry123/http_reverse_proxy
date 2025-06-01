@@ -34,6 +34,8 @@ pub const API_SERVERS_LIST: &str = "list/servers";
 
 pub const API_SERVERS_ACTIVE: &str = "server/active";
 
+pub const API_METRICS_GET_HITS: &str = "metrics/hits";
+
 // Json response
 pub const JSON_STATUS_LABEL_SUCCESS: &str = "success";
 pub const JSON_STATUS_LABEL_ERROR: &str = "error";

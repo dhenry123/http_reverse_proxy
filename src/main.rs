@@ -6,6 +6,8 @@ mod html;
 mod http_response;
 mod init;
 mod internal_server_free_port;
+mod state;
+mod statistics;
 mod structs;
 
 use api::api_rest::apirest_http;
@@ -18,6 +20,8 @@ use forwarders::internal_http::internal_http;
 use forwarders::tls_acceptor::tls_acceptor_init;
 use init::init_logging;
 use log::info;
+use state::AppState;
+use statistics::metrics::ProxyMetrics;
 use std::{process, sync::Arc};
 use structs::GenericError;
 use tokio::sync::RwLock;
@@ -33,6 +37,9 @@ fn parse_bind_address(input: &str) -> Result<IpAddr, String> {
 #[tokio::main]
 async fn main() -> Result<(), GenericError> {
     init_logging();
+    let state = Arc::new(AppState {
+        metrics: ProxyMetrics::new(),
+    });
     // load configuration from yaml
     let args = Args::parse();
     let mut config_manager = ConfigManager::new(args);
@@ -57,6 +64,7 @@ async fn main() -> Result<(), GenericError> {
         let ipaddr = parse_bind_address(&frontend.addr).unwrap();
         let frontend_addr = SocketAddr::from((ipaddr, frontend.port));
         let listener: tokio::task::JoinHandle<()>;
+        let state = state.clone();
 
         if frontend.tls {
             // Frontend https
@@ -66,6 +74,7 @@ async fn main() -> Result<(), GenericError> {
                     shared_manager,
                     frontend.clone().name,
                     frontend_addr,
+                    state,
                     tls_acceptor,
                 )
                 .await
@@ -77,7 +86,8 @@ async fn main() -> Result<(), GenericError> {
             // Frontend http
             listener = tokio::spawn(async move {
                 if let Err(e) =
-                    proxy_from_http(shared_manager, frontend.clone().name, frontend_addr).await
+                    proxy_from_http(shared_manager, frontend.clone().name, frontend_addr, state)
+                        .await
                 {
                     log::error!("[Error] Frontend {} crashed: {}", frontend.name, e);
                 }
@@ -109,8 +119,13 @@ async fn main() -> Result<(), GenericError> {
     let frontend_name = "APIRest".to_string();
     listener = tokio::spawn(async move {
         let shared_manager = shared_manager.clone();
-        if let Err(e) =
-            apirest_http(shared_manager.clone(), frontend_name.clone(), frontend_addr).await
+        if let Err(e) = apirest_http(
+            shared_manager.clone(),
+            frontend_name.clone(),
+            frontend_addr,
+            state.clone(),
+        )
+        .await
         {
             log::error!("[Error] Api rest {} crashed: {}", frontend_name, e);
             log::error!("Fatal error, exiting");

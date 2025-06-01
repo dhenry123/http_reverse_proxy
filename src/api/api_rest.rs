@@ -7,26 +7,25 @@ use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::RwLock};
 
 use crate::{
-    api::{list::api_list_config_object, server::api_server_active_set},
+    api::{
+        list::api_list_config_object, metrics::api_metric_get_hits, server::api_server_active_set,
+    },
     config_manager::ConfigManager,
     constants::{
-        API_BACKENDS_LIST, API_FRONTENDS_LIST, API_SERVERS_ACTIVE, API_SERVERS_LIST, API_VERSION,
+        API_BACKENDS_LIST, API_FRONTENDS_LIST, API_METRICS_GET_HITS, API_SERVERS_ACTIVE,
+        API_SERVERS_LIST, API_VERSION,
     },
     forwarders::internal_http::{InternalServerErrors, internal_error},
+    state::AppState,
     structs::{ApiOjectTypes, GenericError},
 };
 
 async fn backend_service(
     req: Request<hyper::body::Incoming>,
+    config_manager: Arc<RwLock<ConfigManager>>,
+    peer_addr: SocketAddr,
+    state: Arc<AppState>,
 ) -> Result<Response<Full<Bytes>>, Infallible> {
-    //let peer_addr = req.extensions().get::<SocketAddr>().cloned().unwrap();
-    let config_manager = req
-        .extensions()
-        .get::<Arc<RwLock<ConfigManager>>>()
-        .cloned()
-        .unwrap()
-        .clone();
-
     let proxy_config = config_manager.read().await.get_config().await;
     let (parts, body) = req.into_parts();
 
@@ -59,11 +58,18 @@ async fn backend_service(
         {
             Ok(api_list_config_object(ApiOjectTypes::PoolServers, proxy_config).await?)
         }
-        // ---> test
+        // ---> set server active attribute
         (Method::PUT, path)
             if path.starts_with(format!("/{}/{}", API_VERSION, API_SERVERS_ACTIVE,).as_str()) =>
         {
             Ok(api_server_active_set(config_manager.clone(), body_bytes).await?)
+        }
+        // metrics
+        // ----> hits
+        (Method::GET, path)
+            if path.starts_with(format!("/{}/{}", API_VERSION, API_METRICS_GET_HITS,).as_str()) =>
+        {
+            Ok(api_metric_get_hits(state, &parts)?)
         }
         // else
         _ => Ok(internal_error(InternalServerErrors::RouteNotFound, parts).await?),
@@ -74,6 +80,7 @@ pub async fn apirest_http(
     config_manager: Arc<tokio::sync::RwLock<ConfigManager>>,
     frontend_name: String,
     addr: SocketAddr,
+    state: Arc<AppState>,
 ) -> Result<(), GenericError> {
     info!(
         "API REST HTTP listener: {} is listening on: {}",
@@ -86,16 +93,14 @@ pub async fn apirest_http(
         match listener.accept().await {
             Ok((tcp, peer_addr)) => {
                 let config_manager = config_manager.clone();
+                let state = state.clone();
                 let svc = {
                     // Clone again for the service_fn
                     let config_manager = Arc::clone(&config_manager);
+                    let state = state.clone();
                     // Create the service_fn
-                    service_fn(move |mut req: Request<hyper::body::Incoming>| {
-                        // Insert extensions
-                        req.extensions_mut().insert(config_manager.clone());
-                        req.extensions_mut().insert(peer_addr);
-                        // Call the handler - no async/await here!
-                        backend_service(req)
+                    service_fn(move |req: Request<hyper::body::Incoming>| {
+                        backend_service(req, config_manager.clone(), peer_addr, state.clone())
                     })
                 };
                 let io = TokioIo::new(tcp);

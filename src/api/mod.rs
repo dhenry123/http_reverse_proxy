@@ -5,4 +5,5 @@ pub mod json_body;
 pub mod json_datetime;
 pub mod json_reponse;
 pub mod list;
+pub mod metrics;
 pub mod server;

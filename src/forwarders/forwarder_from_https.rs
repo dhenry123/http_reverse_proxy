@@ -9,6 +9,7 @@ use tokio_rustls::TlsAcceptor;
 use crate::{
     config_manager::ConfigManager,
     forwarders::{forwarder_handler::handle_request, forwarder_helper::get_http_client},
+    state::AppState,
     structs::GenericError,
 };
 
@@ -16,6 +17,7 @@ pub async fn proxy_from_https(
     config_manager: Arc<RwLock<ConfigManager>>,
     frontend_name: String,
     addr: SocketAddr,
+    state: Arc<AppState>,
     tls_acceptor: TlsAcceptor,
 ) -> Result<(), GenericError> {
     let client = get_http_client();
@@ -52,6 +54,7 @@ pub async fn proxy_from_https(
                         .ok_or(GenericError::from("No servers available"))?;
                     let config_manager = config_manager.clone();
                     let frontend_name = frontend_name.clone();
+                    let state = state.clone();
                     // Create the service_fn
                     service_fn(move |req: Request<hyper::body::Incoming>| {
                         // Call the handler - no async/await here!
@@ -62,6 +65,7 @@ pub async fn proxy_from_https(
                             servers_tracker.clone(),
                             config_manager.clone(),
                             client.clone(),
+                            state.clone(),
                         )
                     })
                 };
@@ -70,6 +74,8 @@ pub async fn proxy_from_https(
                 let frontend_name = frontend_name.clone();
                 match tls_acceptor.accept(tcp).await {
                     Ok(tls_stream) => {
+                        let state = state.clone();
+                        state.metrics.increment_frontend(&frontend_name);
                         // Handle the connection
                         let io = TokioIo::new(tls_stream);
                         let svc = svc.clone();

@@ -8,6 +8,7 @@ use tokio::{net::TcpListener, sync::RwLock};
 use crate::{
     config_manager::ConfigManager,
     forwarders::{forwarder_handler::handle_request, forwarder_helper::get_http_client},
+    state::AppState,
     structs::GenericError,
 };
 
@@ -15,6 +16,7 @@ pub async fn proxy_from_http(
     config_manager: Arc<RwLock<ConfigManager>>,
     frontend_name: String,
     addr: SocketAddr,
+    state: Arc<AppState>,
 ) -> Result<(), GenericError> {
     info!(
         "HTTP listener: {} is listening on: {}",
@@ -28,6 +30,8 @@ pub async fn proxy_from_http(
         match listener.accept().await {
             Ok((tcp, peer_addr)) => {
                 let frontend_name = frontend_name.clone();
+                let state = state.clone();
+                state.metrics.increment_frontend(&frontend_name);
 
                 let svc = {
                     // Clone the values we need to move into the closure
@@ -40,6 +44,8 @@ pub async fn proxy_from_http(
 
                     let config_manager = config_manager.clone();
                     let frontend_name = frontend_name.clone();
+                    let state = state.clone();
+
                     // Create the service_fn
                     service_fn(move |req: Request<hyper::body::Incoming>| {
                         // Call the handler - no async/await here!
@@ -50,6 +56,7 @@ pub async fn proxy_from_http(
                             servers_tracker.clone(),
                             config_manager.clone(),
                             client.clone(),
+                            state.clone(),
                         )
                     })
                 };
