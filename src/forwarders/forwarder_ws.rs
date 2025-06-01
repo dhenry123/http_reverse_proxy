@@ -2,6 +2,7 @@ use futures::Sink;
 use futures_util::{SinkExt, stream::StreamExt};
 use hyper::{Method, Request, Response, Uri, body};
 use hyper_util::rt::TokioIo;
+use log::debug;
 use std::sync::Arc;
 
 use tokio_tungstenite::{
@@ -41,7 +42,7 @@ pub async fn handle_websocket_upgrade(
     };
     let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
 
-    println!("upstream_uri: {}", upstream_uri);
+    debug!("upstream_uri: {}", upstream_uri);
 
     // Generate WebSocket accept key
     let key = parts
@@ -50,7 +51,7 @@ pub async fn handle_websocket_upgrade(
         .ok_or("Missing Sec-WebSocket-Key header");
 
     if key.is_err() {
-        println!("Error on websocket key Result: {:?}", key);
+        log::error!("Error on websocket key Result: {:?}", key);
     }
     let accept = generate_accept_key(key.unwrap().as_bytes());
 
@@ -61,7 +62,7 @@ pub async fn handle_websocket_upgrade(
         INTERNAL_ROUTE_MAKE_WEBSOCKET,
         accept
     );
-    println!("Uri to get websocket header: {}", internal_upstream_uri);
+    debug!("Uri to get websocket header: {}", internal_upstream_uri);
     let forwarded_req = {
         let builder = Request::builder()
             .method(Method::GET)
@@ -102,10 +103,10 @@ pub async fn handle_websocket_upgrade(
 
         tokio::select! {
             _ = server_to_upstream => {
-                println!("[DEBUG] Client→upstream task completed");
+                debug!("Client→upstream task completed");
             },
             _ = upstream_to_server => {
-                println!("[DEBUG] Upstream→client task completed");
+                debug!("Upstream→client task completed");
             },
         }
     });
@@ -140,18 +141,18 @@ where
             Ok(Message::Pong(_)) => continue, // Ignore pong replies
             Ok(msg) => {
                 if msg.is_close() {
-                    println!("[DEBUG] {} closed the connection", direction);
+                    debug!("{} closed the connection", direction);
                     let _ = dest.close().await;
                     break;
                 }
-                println!("[DEBUG] Sending message: {}", msg);
+                debug!("Sending message: {}", msg);
                 if let Err(e) = dest.send(msg).await {
-                    eprintln!("[ERROR] Failed sending to {}: {}", direction, e);
+                    log::error!("Failed sending to {}: {}", direction, e);
                     break;
                 }
             }
             Err(e) => {
-                eprintln!("[ERROR] {} message error: {}", direction, e);
+                log::error!("{} message error: {}", direction, e);
                 break;
             }
         }

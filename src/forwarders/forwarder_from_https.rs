@@ -1,6 +1,7 @@
 use hyper::{Request, server::conn::http1, service::service_fn};
 
 use hyper_util::rt::{TokioIo, TokioTimer};
+use log::info;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::RwLock};
 use tokio_rustls::TlsAcceptor;
@@ -21,7 +22,7 @@ pub async fn proxy_from_https(
 
     // Listener
     let listener = TcpListener::bind(addr).await?;
-    println!(
+    info!(
         "HTTPS listener: {} is listening on: {}",
         frontend_name.clone(),
         addr
@@ -83,25 +84,27 @@ pub async fn proxy_from_https(
                                 .await
                             {
                                 if !err.is_timeout() {
-                                    eprintln!(
+                                    log::error!(
                                         "[https listener error]: name: {} - from: {} - error: {:?}",
-                                        frontend_name, peer_addr, err
+                                        frontend_name,
+                                        peer_addr,
+                                        err
                                     )
                                 }
                             }
                         });
                     }
                     Err(e) => {
-                        eprintln!("TLS failed: {} - peer: {}", e, peer_addr);
+                        log::error!("TLS failed: {} - peer: {}", e, peer_addr);
                         if let Some(inner) = e.get_ref() {
-                            eprintln!("Root cause: {:?}", inner.source());
+                            log::error!("Root cause: {:?}", inner.source());
                         }
                     }
                 }
             }
             Err(e) => {
                 if e.kind() != std::io::ErrorKind::WouldBlock {
-                    eprintln!("[ACCEPT ERROR] {:?}", e);
+                    log::error!("[ACCEPT ERROR] {:?}", e);
                 }
             }
         }

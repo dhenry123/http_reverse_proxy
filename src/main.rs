@@ -4,6 +4,7 @@ mod constants;
 mod forwarders;
 mod html;
 mod http_response;
+mod init;
 mod internal_server_free_port;
 mod structs;
 
@@ -15,6 +16,8 @@ use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
 use forwarders::internal_http::internal_http;
 use forwarders::tls_acceptor::tls_acceptor_init;
+use init::init_logging;
+use log::info;
 use std::{process, sync::Arc};
 use structs::GenericError;
 use tokio::sync::RwLock;
@@ -29,6 +32,7 @@ fn parse_bind_address(input: &str) -> Result<IpAddr, String> {
 
 #[tokio::main]
 async fn main() -> Result<(), GenericError> {
+    init_logging();
     // load configuration from yaml
     let args = Args::parse();
     let mut config_manager = ConfigManager::new(args);
@@ -66,7 +70,7 @@ async fn main() -> Result<(), GenericError> {
                 )
                 .await
                 {
-                    eprintln!("[Error] Frontend {} crashed: {}", frontend.name, e);
+                    log::error!("[Error] Frontend {} crashed: {}", frontend.name, e);
                 }
             });
         } else {
@@ -75,7 +79,7 @@ async fn main() -> Result<(), GenericError> {
                 if let Err(e) =
                     proxy_from_http(shared_manager, frontend.clone().name, frontend_addr).await
                 {
-                    eprintln!("[Error] Frontend {} crashed: {}", frontend.name, e);
+                    log::error!("[Error] Frontend {} crashed: {}", frontend.name, e);
                 }
             });
         }
@@ -90,8 +94,8 @@ async fn main() -> Result<(), GenericError> {
     let frontend_name = "internal".to_string();
     listener = tokio::spawn(async move {
         if let Err(e) = internal_http(frontend_name.clone(), frontend_addr).await {
-            eprintln!("[Error] Frontend {} crashed: {}", frontend_name, e);
-            eprintln!("Fatal error, exiting");
+            log::error!("[Error] Frontend {} crashed: {}", frontend_name, e);
+            log::error!("Fatal error, exiting");
             process::exit(10);
         }
     });
@@ -108,8 +112,8 @@ async fn main() -> Result<(), GenericError> {
         if let Err(e) =
             apirest_http(shared_manager.clone(), frontend_name.clone(), frontend_addr).await
         {
-            eprintln!("[Error] Api rest {} crashed: {}", frontend_name, e);
-            eprintln!("Fatal error, exiting");
+            log::error!("[Error] Api rest {} crashed: {}", frontend_name, e);
+            log::error!("Fatal error, exiting");
             process::exit(10);
         }
     });
@@ -118,14 +122,14 @@ async fn main() -> Result<(), GenericError> {
     // Wait for CTRL+C or all servers to exit
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
-            println!("Shutdown signal received");
+            info!("Shutdown signal received");
         }
         _ = async {
             for listener in listeners {
                 let _ = listener.await;
             }
         } => {
-            println!("All frontend servers terminated");
+            info!("All frontend servers terminated");
         }
     }
     Ok(())

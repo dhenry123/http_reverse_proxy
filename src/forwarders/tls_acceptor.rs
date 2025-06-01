@@ -1,3 +1,4 @@
+use log::{debug, info};
 use rustls::server::{ClientHello, ResolvesServerCert};
 use std::collections::HashMap;
 use std::fs;
@@ -28,12 +29,12 @@ impl ResolvesServerCert for SnAwareCertResolver {
     ) -> Option<Arc<tokio_rustls::rustls::sign::CertifiedKey>> {
         // Try the main resolver first
         if let Some(cert) = self.inner.resolve(client_hello) {
-            println!("Return legitimate cert");
+            debug!("Return legitimate cert");
             return Some(cert);
         }
         // If no match, use fallback if available
         if let Some(fallback) = &self.fallback_cert {
-            println!("Return fallback cert");
+            debug!("Return fallback cert");
             return Some(fallback.clone());
         }
         None
@@ -59,7 +60,7 @@ pub fn create_tls_config(
         cert_resolver
             .add(&domain, cert_key)
             .map_err(|e| format!("Failed to add certificate for {}: {}", domain, e))?;
-        println!("Tls domain loaded: {}", domain);
+        info!("Tls domain loaded: {}", domain);
     }
 
     // Wrap your resolver with our SNI-aware version
@@ -85,7 +86,7 @@ pub fn load_combined_pems(
 > {
     let mut cert_map = HashMap::new();
 
-    println!("Configuration certs path: {:?}", cert_dir);
+    info!("Configuration certs path: {:?}", cert_dir);
     let certs_files_list = fs::read_dir(cert_dir).map_err(|e| -> GenericError { Box::new(e) })?;
     for entry in certs_files_list {
         let entry = entry.map_err(|e| -> GenericError { Box::new(e) })?;
@@ -122,14 +123,14 @@ pub fn load_combined_pems(
             }
 
             if cert_chain.is_empty() {
-                eprintln!("Warning: No certificates found in {}", path.display());
+                log::error!("Warning: No certificates found in {}", path.display());
                 continue;
             }
 
             let private_key = match private_key {
                 Some(key) => key,
                 None => {
-                    eprintln!("Warning: No private key found in {}", path.display());
+                    log::error!("Warning: No private key found in {}", path.display());
                     continue;
                 }
             };

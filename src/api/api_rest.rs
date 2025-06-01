@@ -2,6 +2,7 @@ use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, server::conn::http1, service::service_fn};
 use hyper_util::rt::{TokioIo, TokioTimer};
+use log::{debug, info};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::RwLock};
 
@@ -35,9 +36,9 @@ async fn backend_service(
         Err(_) => None,
     };
 
-    println!("parts: {:?}", parts);
-    println!("query: {:?}", parts.uri.query());
-    println!("route : {:?}", parts.uri);
+    debug!("parts: {:?}", parts);
+    debug!("query: {:?}", parts.uri.query());
+    debug!("route : {:?}", parts.uri);
     match (parts.clone().method, parts.uri.path()) {
         // List
         // ---> frontends
@@ -74,7 +75,7 @@ pub async fn apirest_http(
     frontend_name: String,
     addr: SocketAddr,
 ) -> Result<(), GenericError> {
-    println!(
+    info!(
         "API REST HTTP listener: {} is listening on: {}",
         frontend_name, addr
     );
@@ -108,13 +109,13 @@ pub async fn apirest_http(
                         .serve_connection(io, svc)
                         .await
                     {
-                        eprintln!("[internal listener error] {:?}", err);
+                        log::error!("[internal listener error] {:?}", err);
                     }
                 });
             }
             Err(e) => {
                 // Only log persistent errors
-                eprintln!("[internal listener ACCEPT ERROR] {:?}", e);
+                log::error!("[internal listener ACCEPT ERROR] {:?}", e);
             }
         }
     }

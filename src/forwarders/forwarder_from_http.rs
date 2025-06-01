@@ -1,6 +1,7 @@
 use hyper::{Request, server::conn::http1, service::service_fn};
 
 use hyper_util::rt::{TokioIo, TokioTimer};
+use log::info;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{net::TcpListener, sync::RwLock};
 
@@ -15,7 +16,7 @@ pub async fn proxy_from_http(
     frontend_name: String,
     addr: SocketAddr,
 ) -> Result<(), GenericError> {
-    println!(
+    info!(
         "HTTP listener: {} is listening on: {}",
         &frontend_name, addr
     );
@@ -67,16 +68,18 @@ pub async fn proxy_from_http(
                     {
                         // no display if IncompleteMessage
                         if !err.is_incomplete_message() {
-                            eprintln!(
+                            log::error!(
                                 "[https listener error]: name: {} - from: {} - error: {:?}",
-                                frontend_name, peer_addr, err
+                                frontend_name,
+                                peer_addr,
+                                err
                             );
                         }
                     }
                 });
             }
             Err(e) => {
-                eprintln!("[ACCEPT ERROR] {:?}", e);
+                log::error!("[ACCEPT ERROR] {:?}", e);
             }
         }
     }

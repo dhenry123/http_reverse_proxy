@@ -13,6 +13,7 @@ use crate::structs::GenericError;
 //     println!("Creating default ssl certificate");
 //     generate_default_cert(&certs_path)?;
 // }
+
 pub fn generate_default_cert(path: &PathBuf) -> Result<(), GenericError> {
     let mut params: CertificateParams = Default::default();
     params.not_before = date_time_ymd(1975, 1, 1);

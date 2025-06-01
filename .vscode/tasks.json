@@ -26,6 +26,11 @@
         "-x",
         "run -- -c ~/git/http_reverse_proxy/config.yaml -t ~/git/http_reverse_proxy/certs"
       ],
+      "options": {
+        "env": {
+          "RUST_LOG": "info"
+        }
+      },
       "group": {
         "kind": "build",
         "isDefault": true

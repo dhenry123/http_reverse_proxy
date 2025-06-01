@@ -1,4 +1,5 @@
 use clap::Parser;
+use log::info;
 use std::{collections::HashMap, env, fs::File, path::PathBuf, sync::Arc};
 
 use crate::{
@@ -57,7 +58,7 @@ impl ConfigManager {
     }
 
     pub async fn load(&mut self) -> Result<(), GenericError> {
-        println!("Configuration file path: {:?}", self.config_path.clone());
+        info!("Configuration file path: {:?}", self.config_path.clone());
         let file = File::open(self.config_path.clone())?;
 
         // Load config

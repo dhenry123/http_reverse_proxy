@@ -5,6 +5,7 @@ use hyper::{
     service::service_fn,
 };
 use hyper_util::rt::{TokioIo, TokioTimer};
+use log::info;
 use std::{convert::Infallible, net::SocketAddr};
 use tokio::net::TcpListener;
 use tokio_tungstenite::tungstenite::http;
@@ -137,7 +138,7 @@ async fn backend_service(
 }
 
 pub async fn internal_http(name: String, addr: SocketAddr) -> Result<(), GenericError> {
-    println!("Internal HTTP listener: {} is listening on: {}", name, addr);
+    info!("Internal HTTP listener: {} is listening on: {}", name, addr);
 
     let listener = TcpListener::bind(addr).await?;
 
@@ -155,13 +156,13 @@ pub async fn internal_http(name: String, addr: SocketAddr) -> Result<(), Generic
                         .serve_connection(io, service_fn(backend_service))
                         .await
                     {
-                        eprintln!("[internal listener error] {:?}", err);
+                        log::error!("[internal listener error] {:?}", err);
                     }
                 });
             }
             Err(e) => {
                 // Only log persistent errors
-                eprintln!("[internal listener ACCEPT ERROR] {:?}", e);
+                log::error!("[internal listener ACCEPT ERROR] {:?}", e);
             }
         }
     }

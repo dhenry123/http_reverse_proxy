@@ -11,6 +11,7 @@ use hyper_util::{
     client::legacy::{Client, Error, connect::HttpConnector},
     rt::TokioExecutor,
 };
+use log::debug;
 use serde_json::json;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
@@ -82,7 +83,7 @@ pub async fn handle_request(
     client: Client<HttpsConnector<HttpConnector>, Incoming>,
 ) -> Result<Response<body::Incoming>, hyper_util::client::legacy::Error> {
     if is_websocket_request(&req) {
-        println!("websocket request detected");
+        debug!("websocket request detected");
         return handle_websocket_upgrade(req, &servers_tracker).await;
     }
 
@@ -124,12 +125,14 @@ pub async fn handle_request(
     }
     let uri = upstream_uri.parse::<Uri>();
     let upstream_uri: Uri;
+    debug!("original_host {:?}", original_host);
+
     match uri {
         Ok(uri) => upstream_uri = uri,
-        Err(_initial_error) => {
-            // println!("Initial error: {}", initial_error);
-            // println!("Parts: {:?}", parts);
-            // println!("original_host {:?}", original_host);
+        Err(initial_error) => {
+            debug!("Initial error: {}", initial_error);
+            debug!("Parts: {:?}", parts);
+            debug!("original_host {:?}", original_host);
             let upstream_uri = get_internal_error_no_backend_server_available_uri(parts.clone());
             let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
             let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
@@ -143,7 +146,7 @@ pub async fn handle_request(
                     );
                 }
                 Err(internal_server_error) => {
-                    eprintln!(
+                    log::error!(
                         "Request forwarding calling internal server, error: {:?}",
                         internal_server_error
                     );
@@ -153,7 +156,7 @@ pub async fn handle_request(
         }
     }
     //====> To check round robin load balance
-    // println!("upstream_uri: {}", upstream_uri);
+    debug!("upstream_uri: {}", upstream_uri);
 
     let forwarded_req = get_forwarded_red(parts.clone(), upstream_uri.clone(), peer_addr, body);
 
@@ -164,16 +167,18 @@ pub async fn handle_request(
             // replace backend host response with original host
             let original_host = original_host.clone();
             set_response_header(original_host, &mut response).await;
+            debug!("{:?}", response);
             Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
         }
         Err(initial_error) => {
-            eprintln!(
+            log::error!(
                 "Request forwarding initial error: {:?} - upstream uri: {}",
-                initial_error, upstream_uri
+                initial_error,
+                upstream_uri
             );
             if initial_error.is_connect() {
                 // upstream serveur failure, server must be desactivated
-                println!("upstream_server failure: {:?}", upstream_server);
+                log::error!("upstream_server failure: {:?}", upstream_server);
                 deactivate_server(upstream_server).await;
                 // Return internal response unavailable service 503
                 match get_fallback_response(parts.clone(), FallBackResponseType::ServerUnavailable)
@@ -185,7 +190,7 @@ pub async fn handle_request(
                         Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
                     }
                     Err(internal_server_error) => {
-                        eprintln!(
+                        log::error!(
                             "Error on calling fallback response: {:?}",
                             internal_server_error
                         );
