@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, fs, path::PathBuf, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use hyper::{Request, body, header::HeaderValue};
 use hyper_tls::HttpsConnector;
@@ -6,16 +6,13 @@ use hyper_util::{
     client::legacy::{Client, connect::HttpConnector},
     rt::{TokioExecutor, TokioTimer},
 };
-use rustls::{ServerConfig, crypto::aws_lc_rs::sign::any_supported_type, sign::CertifiedKey};
-
-use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
 use crate::{
     config_manager::ConfigManager,
     constants::{ANTIBOT_COOKIE_NAME, POOL_IDLE_TIMEOUT, POOL_MAX_IDLE_PER_HOST},
-    structs::{BackendServer, GenericError, GenericResult},
+    structs::BackendServer,
 };
 
 use super::servers_tracker::ServerTracker;
@@ -42,96 +39,6 @@ pub fn build_upstream_uri(backend_server: BackendServer, is_web_socket: bool) ->
         upstream = format!("{}:{}", upstream, backend_server.path.clone().unwrap());
     }
     return upstream;
-}
-
-// Creates a TLS configuration from loaded certificates
-pub fn create_tls_config(
-    cert_map: HashMap<String, (Vec<CertificateDer<'static>>, PrivateKeyDer<'_>)>,
-) -> GenericResult<Arc<ServerConfig>> {
-    let mut cert_resolver = rustls::server::ResolvesServerCertUsingSni::new();
-
-    for (domain, (cert_chain, private_key)) in cert_map {
-        let key = any_supported_type(&private_key)
-            .map_err(|e| format!("Unsupported private key: {}", e))?;
-        let cert_key = CertifiedKey::new(cert_chain, key);
-        cert_resolver
-            .add(&domain, cert_key)
-            .map_err(|e| format!("Failed to add certificate for {}: {}", domain, e))?;
-        println!("Tls domain loaded: {}", domain);
-    }
-
-    // Build final configuration
-    let config = ServerConfig::builder()
-        .with_no_client_auth()
-        .with_cert_resolver(Arc::new(cert_resolver));
-
-    Ok(Arc::new(config))
-}
-
-// Load certificates from combined PEM files (cert + key in one file)
-pub fn load_combined_pems(
-    cert_dir: PathBuf,
-) -> Result<
-    HashMap<std::string::String, (Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)>,
-    GenericError,
-> {
-    let mut cert_map = HashMap::new();
-
-    println!("Configuration certs path: {:?}", cert_dir);
-    let certs_files_list = fs::read_dir(cert_dir).map_err(|e| -> GenericError { Box::new(e) })?;
-    for entry in certs_files_list {
-        let entry = entry.map_err(|e| -> GenericError { Box::new(e) })?;
-        let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "pem") {
-            let domain = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .ok_or_else(|| {
-                    Box::<dyn Error + Send + Sync + 'static>::from("Invalid PEM filename")
-                })?
-                .to_string();
-
-            let file_contents = fs::read(&path).map_err(|e| -> GenericError { Box::new(e) })?;
-            let mut reader = std::io::Cursor::new(file_contents);
-
-            // Read all items from the PEM file, collecting any errors
-            let items: Vec<rustls_pemfile::Item> = rustls_pemfile::read_all(&mut reader)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| -> GenericError { Box::new(e) })?;
-
-            // Process items into certificates and private key
-            let mut cert_chain = Vec::new();
-            let mut private_key = None;
-
-            for item in items {
-                match item {
-                    rustls_pemfile::Item::X509Certificate(cert) => {
-                        cert_chain.push(rustls::pki_types::CertificateDer::from(cert.to_vec()));
-                    }
-                    rustls_pemfile::Item::Pkcs8Key(key) if private_key.is_none() => {
-                        private_key = Some(rustls::pki_types::PrivateKeyDer::from(key));
-                    }
-                    _ => {}
-                }
-            }
-
-            if cert_chain.is_empty() {
-                eprintln!("Warning: No certificates found in {}", path.display());
-                continue;
-            }
-
-            let private_key = match private_key {
-                Some(key) => key,
-                None => {
-                    eprintln!("Warning: No private key found in {}", path.display());
-                    continue;
-                }
-            };
-
-            cert_map.insert(domain, (cert_chain, private_key));
-        }
-    }
-    Ok(cert_map)
 }
 
 /**

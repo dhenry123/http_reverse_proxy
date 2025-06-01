@@ -1,7 +1,7 @@
 use hyper::{Request, server::conn::http1, service::service_fn};
 
 use hyper_util::rt::{TokioIo, TokioTimer};
-use std::{error::Error, net::SocketAddr, sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::RwLock};
 use tokio_rustls::TlsAcceptor;
 
@@ -48,9 +48,7 @@ pub async fn proxy_from_https(
                         .read()
                         .await
                         .get_tracker(frontend_name.clone())
-                        .ok_or(Box::<dyn Error + Send + Sync + 'static>::from(
-                            "No servers available",
-                        ))?;
+                        .ok_or(GenericError::from("No servers available"))?;
                     let config_manager = config_manager.clone();
                     let frontend_name = frontend_name.clone();
                     // Create the service_fn

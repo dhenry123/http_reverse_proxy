@@ -127,9 +127,9 @@ pub async fn handle_request(
     match uri {
         Ok(uri) => upstream_uri = uri,
         Err(initial_error) => {
-            println!("Initial error: {}", initial_error);
-            println!("Parts: {:?}", parts);
-            println!("original_host {:?}", original_host);
+            // println!("Initial error: {}", initial_error);
+            // println!("Parts: {:?}", parts);
+            // println!("original_host {:?}", original_host);
             let upstream_uri = get_internal_error_no_backend_server_available_uri(parts.clone());
             let upstream_uri = upstream_uri.parse::<Uri>().unwrap();
             let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
