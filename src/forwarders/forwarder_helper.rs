@@ -6,6 +6,7 @@ use hyper_util::{
     client::legacy::{Client, connect::HttpConnector},
     rt::{TokioExecutor, TokioTimer},
 };
+use log::debug;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -71,7 +72,7 @@ pub fn get_upstream_server(
 ) -> Option<BackendServer> {
     // Which backend ?
     let backend_server = servers_tracker.get_next_backend(&original_host);
-    //println!("backend_server: {:?}", backend_server);
+    debug!("backend_server: {:?}", backend_server);
     backend_server
 }
 
