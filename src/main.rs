@@ -13,7 +13,7 @@ mod structs;
 use api::api_rest::apirest_http;
 use clap::Parser;
 use config_manager::{Args, ConfigManager};
-use constants::API_LISTENING_PORT;
+use constants::{API_LISTENING_ADDR, API_LISTENING_PORT};
 use forwarders::forwarder_from_http::proxy_from_http;
 use forwarders::forwarder_from_https::proxy_from_https;
 use forwarders::internal_http::internal_http;
@@ -22,7 +22,7 @@ use init::init_logging;
 use log::info;
 use state::AppState;
 use statistics::metrics::ProxyMetrics;
-use std::{process, sync::Arc};
+use std::{env, process, sync::Arc};
 use structs::GenericError;
 use tokio::sync::RwLock;
 
@@ -95,8 +95,14 @@ async fn main() -> Result<(), GenericError> {
         }
         listeners.push(listener);
     }
+
     // Internal frontend http (hard because i don't know how to implement a fake Response<Incoming> in listeners when backend is disabled
-    let ipaddr = parse_bind_address("127.0.0.1").unwrap();
+    let ipaddr = parse_bind_address(
+        env::var("API_LISTENING_ADDR")
+            .as_deref()
+            .unwrap_or(API_LISTENING_ADDR),
+    )
+    .unwrap();
     let port = internal_server_free_port::init_global_port(23000, 27000);
     let frontend_addr = SocketAddr::from((ipaddr, port));
     let listener: tokio::task::JoinHandle<()>;

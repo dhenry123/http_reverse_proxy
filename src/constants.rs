@@ -27,6 +27,7 @@ pub const SECRET_WS_GUID: &str = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 // API Rest
 pub const API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN: &str = "*";
 pub const API_VERSION: &str = "api/v1";
+pub const API_LISTENING_ADDR: &str = "127.0.0.1";
 pub const API_LISTENING_PORT: u16 = 27001;
 pub const API_FRONTENDS_LIST: &str = "list/frontends";
 pub const API_BACKENDS_LIST: &str = "list/backends";
