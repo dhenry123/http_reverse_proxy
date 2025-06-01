@@ -126,7 +126,7 @@ pub async fn handle_request(
     let upstream_uri: Uri;
     match uri {
         Ok(uri) => upstream_uri = uri,
-        Err(initial_error) => {
+        Err(_initial_error) => {
             // println!("Initial error: {}", initial_error);
             // println!("Parts: {:?}", parts);
             // println!("original_host {:?}", original_host);
