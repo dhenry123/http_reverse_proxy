@@ -15,24 +15,28 @@ use crate::structs::{GenericError, GenericResult};
 struct SnAwareCertResolver {
     // Your existing certificate resolver or certificate store
     inner: Arc<dyn ResolvesServerCert>,
+    fallback_cert: Option<Arc<CertifiedKey>>,
 }
 
+/**
+ * @todo refactor currently used for debug
+ */
 impl ResolvesServerCert for SnAwareCertResolver {
     fn resolve(
         &self,
         client_hello: ClientHello,
     ) -> Option<Arc<tokio_rustls::rustls::sign::CertifiedKey>> {
-        // Get the server name requested by client
-        if let Some(sni) = client_hello.server_name() {
-            println!("Client requested domain: {}", sni);
-            // Here you could:
-            // 1. Log the unmatched domain
-            // 2. Dynamically select a certificate
-            // 3. Return None to reject the connection
+        // Try the main resolver first
+        if let Some(cert) = self.inner.resolve(client_hello) {
+            println!("Return legitimate cert");
+            return Some(cert);
         }
-
-        // Delegate to your original resolver
-        self.inner.resolve(client_hello)
+        // If no match, use fallback if available
+        if let Some(fallback) = &self.fallback_cert {
+            println!("Return fallback cert");
+            return Some(fallback.clone());
+        }
+        None
     }
 }
 
@@ -42,10 +46,16 @@ pub fn create_tls_config(
 ) -> GenericResult<Arc<ServerConfig>> {
     let mut cert_resolver = rustls::server::ResolvesServerCertUsingSni::new();
 
+    let mut fallback: Option<Arc<CertifiedKey>> = None;
+
     for (domain, (cert_chain, private_key)) in cert_map {
         let key = any_supported_type(&private_key)
             .map_err(|e| format!("Unsupported private key: {}", e))?;
         let cert_key = CertifiedKey::new(cert_chain, key);
+        if domain == "localhost".to_string() {
+            fallback = Some(Arc::new(cert_key));
+            continue;
+        }
         cert_resolver
             .add(&domain, cert_key)
             .map_err(|e| format!("Failed to add certificate for {}: {}", domain, e))?;
@@ -55,6 +65,7 @@ pub fn create_tls_config(
     // Wrap your resolver with our SNI-aware version
     let sni_aware_resolver = Arc::new(SnAwareCertResolver {
         inner: Arc::new(cert_resolver),
+        fallback_cert: fallback,
     });
 
     // Build final configuration
