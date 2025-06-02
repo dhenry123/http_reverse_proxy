@@ -171,9 +171,11 @@ pub async fn handle_request(
             let original_host = original_host.clone();
             set_response_header(original_host, &mut response).await;
             debug!("{:?}", response);
-            state
-                .metrics
-                .increment_server(&upstream_server.clone().unwrap().name);
+            // if not some uri called is internal server
+            match upstream_server.clone() {
+                Some(server) => state.metrics.increment_server(&server.name),
+                None => {} //@todo counter error
+            }
 
             Ok::<Response<body::Incoming>, hyper_util::client::legacy::Error>(response)
         }

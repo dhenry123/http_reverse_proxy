@@ -18,11 +18,8 @@ pub fn api_metric_get_hits(
 ) -> Result<Response<Full<Bytes>>, Infallible> {
     let mut response = Response::new(Full::new(Bytes::from("")));
 
-    let mut body: String = "".to_string();
-    let mut status_code = StatusCode::OK;
-
     // Parse query parameters
-    match parts.uri.query() {
+    let (status_code, body): (StatusCode, String) = match parts.uri.query() {
         Some(q) => {
             let query_params = parse_query(q);
             debug!("query_params: {:?}", query_params);
@@ -32,71 +29,68 @@ pub fn api_metric_get_hits(
                     debug!("ft found, value: {}", frontend_name);
                     let hits = state.metrics.get_frontend_count(&frontend_name);
                     match hits {
-                        Some(hits) => {
-                            body = JsonResponse::success(format!("Metric - Frontend hits",))
+                        Some(hits) => (
+                            StatusCode::OK,
+                            JsonResponse::success(format!("Metric - Frontend hits",))
                                 .with_data(json!({ "frontend":frontend_name, "hits": hits }))
                                 .build()
-                                .to_string();
-                        }
-                        None => {
-                            body = JsonResponse::error_bad_request().build().to_string();
-                        }
+                                .to_string(),
+                        ),
+                        None => (
+                            StatusCode::BAD_REQUEST,
+                            JsonResponse::error_bad_request().build().to_string(),
+                        ),
                     }
                 }
-                None => {
-                    match query_params.get("dm") {
-                        Some(domain_name) => {
-                            debug!("ft found, value: {}", domain_name);
-                            let hits = state.metrics.get_domain_count(&domain_name);
+                None => match query_params.get("dm") {
+                    Some(domain_name) => {
+                        debug!("ft found, value: {}", domain_name);
+                        let hits = state.metrics.get_domain_count(&domain_name);
+                        match hits {
+                            Some(hits) => (
+                                StatusCode::OK,
+                                JsonResponse::success(format!("Metric - Domain hits",))
+                                    .with_data(json!({ "domain":domain_name, "hits": hits }))
+                                    .build()
+                                    .to_string(),
+                            ),
+                            None => (
+                                StatusCode::BAD_REQUEST,
+                                JsonResponse::error_bad_request().build().to_string(),
+                            ),
+                        }
+                    }
+                    None => match query_params.get("sv") {
+                        Some(server_name) => {
+                            debug!("ft found, value: {}", server_name);
+                            let hits = state.metrics.get_server_count(&server_name);
                             match hits {
-                                Some(hits) => {
-                                    body = JsonResponse::success(format!("Metric - Domain hits",))
-                                        .with_data(json!({ "domain":domain_name, "hits": hits }))
+                                Some(hits) => (
+                                    StatusCode::OK,
+                                    JsonResponse::success(format!("Metric - Server hits",))
+                                        .with_data(json!({ "server":server_name, "hits": hits }))
                                         .build()
-                                        .to_string();
-                                }
-                                None => {
-                                    body = JsonResponse::error_bad_request().build().to_string();
-                                }
+                                        .to_string(),
+                                ),
+
+                                None => (
+                                    StatusCode::BAD_REQUEST,
+                                    JsonResponse::error_bad_request().build().to_string(),
+                                ),
                             }
                         }
-                        None => {
-                            match query_params.get("sv") {
-                                Some(server_name) => {
-                                    debug!("ft found, value: {}", server_name);
-                                    let hits = state.metrics.get_server_count(&server_name);
-                                    match hits {
-                                        Some(hits) => {
-                                            body = JsonResponse::success(format!(
-                                                "Metric - Server hits",
-                                            ))
-                                            .with_data(
-                                                json!({ "server":server_name, "hits": hits }),
-                                            )
-                                            .build()
-                                            .to_string();
-                                        }
-                                        None => {
-                                            body = JsonResponse::error_bad_request()
-                                                .build()
-                                                .to_string();
-                                        }
-                                    }
-                                }
-                                None => {
-                                    status_code = StatusCode::BAD_REQUEST;
-                                    body = JsonResponse::error_bad_request().build().to_string();
-                                }
-                            };
-                        }
-                    };
-                }
-            };
+                        None => (
+                            StatusCode::BAD_REQUEST,
+                            JsonResponse::error_bad_request().build().to_string(),
+                        ),
+                    },
+                },
+            }
         }
-        None => {
-            status_code = StatusCode::BAD_REQUEST;
-            body = JsonResponse::error_bad_request().build().to_string();
-        }
+        None => (
+            StatusCode::BAD_REQUEST,
+            JsonResponse::error_bad_request().build().to_string(),
+        ),
     };
 
     *response.status_mut() = status_code;
