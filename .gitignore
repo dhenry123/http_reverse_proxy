@@ -6,3 +6,4 @@ certs/*
 tests-before-publish.md
 BenckMarks.md
 APIREST.md
+synctestserver.sh

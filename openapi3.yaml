@@ -11,7 +11,7 @@ externalDocs:
   description: Find out more about http_reverse_proxy
   url: https://github.com/dhenry123/http_reverse_proxy
 servers:
-  - url: https://localhost:27001/api/v1
+  - url: http://localhost:27001/api/v1
 tags:
   - name: list
     description: Get the list of objects contained in the configuration

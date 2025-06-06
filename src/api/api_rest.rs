@@ -8,7 +8,8 @@ use tokio::{net::TcpListener, sync::RwLock};
 
 use crate::{
     api::{
-        list::api_list_config_object, metrics::api_metric_get_hits, server::api_server_active_set,
+        embed_react::serve_embedded_file, list::api_list_config_object,
+        metrics::api_metric_get_hits, server::api_server_active_set,
     },
     config_manager::ConfigManager,
     constants::{
@@ -39,6 +40,10 @@ async fn backend_service(
     debug!("query: {:?}", parts.uri.query());
     debug!("route : {:?}", parts.uri);
     match (parts.clone().method, parts.uri.path()) {
+        //Enbed react app
+        (Method::GET, path) if !path.starts_with(format!("/{}", API_VERSION).as_str()) => {
+            Ok(serve_embedded_file(path).await?)
+        }
         // List
         // ---> frontends
         (Method::GET, path)
