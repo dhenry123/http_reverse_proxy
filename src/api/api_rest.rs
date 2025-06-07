@@ -87,10 +87,7 @@ pub async fn apirest_http(
     addr: SocketAddr,
     state: Arc<AppState>,
 ) -> Result<(), GenericError> {
-    info!(
-        "API REST HTTP listener: {} is listening on: {}",
-        frontend_name, addr
-    );
+    info!("HTTP listener: {} is listening on: {}", frontend_name, addr);
 
     let listener = TcpListener::bind(addr).await?;
 

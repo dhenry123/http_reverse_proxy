@@ -40,3 +40,5 @@ pub const API_METRICS_GET_HITS: &str = "metrics/hits";
 // Json response
 pub const JSON_STATUS_LABEL_SUCCESS: &str = "success";
 pub const JSON_STATUS_LABEL_ERROR: &str = "error";
+
+pub const RUNTIMEBACKENDS_INTERVAL_CHECK: u64 = 5;

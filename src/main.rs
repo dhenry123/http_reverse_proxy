@@ -21,7 +21,6 @@ use forwarders::tls_acceptor::tls_acceptor_init;
 use init::init_logging;
 use log::info;
 use state::AppState;
-use statistics::metrics::ProxyMetrics;
 use std::{env, process, sync::Arc};
 use structs::GenericError;
 use tokio::sync::RwLock;
@@ -36,28 +35,29 @@ fn parse_bind_address(input: &str) -> Result<IpAddr, String> {
 
 #[tokio::main]
 async fn main() -> Result<(), GenericError> {
+    // initializing log
     init_logging();
-    let state = Arc::new(AppState {
-        metrics: ProxyMetrics::new(),
-    });
-    // load configuration from yaml
+    // load configuration from yaml - mutable because expected configuration could be modified via API
     let args = Args::parse();
     let mut config_manager = ConfigManager::new(args);
     config_manager.load().await?;
-    // config object
-    let config = config_manager.get_config().await;
+
+    let state = AppState::new();
 
     // One TLS Acceptor
     let certs_path = config_manager.get_config_tls_certs_path().await;
     let tls_acceptor = tls_acceptor_init(certs_path)?;
 
+    // config object
+    let config = config_manager.get_config().await;
+
     // config manager must be mutable in this process
-    let shared_manager = Arc::new(RwLock::new(config_manager));
+    let config_manager_shared = Arc::new(RwLock::new(config_manager));
 
     // Starting frontends
     let mut listeners = Vec::new();
     for frontend in config.frontends.clone() {
-        let shared_manager = shared_manager.clone();
+        let shared_manager = config_manager_shared.clone();
         if !frontend.active {
             continue;
         }
@@ -124,7 +124,7 @@ async fn main() -> Result<(), GenericError> {
     let listener: tokio::task::JoinHandle<()>;
     let frontend_name = "APIRest".to_string();
     listener = tokio::spawn(async move {
-        let shared_manager = shared_manager.clone();
+        let shared_manager = config_manager_shared.clone();
         if let Err(e) = apirest_http(
             shared_manager.clone(),
             frontend_name.clone(),

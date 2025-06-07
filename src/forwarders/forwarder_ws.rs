@@ -17,13 +17,13 @@ use crate::{
 };
 
 use super::{
+    backend::Backend,
     forwarder_helper::{get_http_client, get_upstream_server},
-    servers_tracker::ServerTracker,
 };
 
 pub async fn handle_websocket_upgrade(
     mut req: Request<hyper::body::Incoming>,
-    servers_tracker: &Arc<ServerTracker>,
+    servers_tracker: &Arc<Backend>,
 ) -> Result<Response<body::Incoming>, hyper_util::client::legacy::Error> {
     let upgraded_fut = hyper::upgrade::on(&mut req);
 

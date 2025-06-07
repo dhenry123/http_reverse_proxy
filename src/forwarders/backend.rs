@@ -6,11 +6,11 @@ use std::{
 use crate::structs::{BackendServer, ProxyConfig};
 
 #[derive(Debug)]
-pub struct ServerTracker {
+pub struct Backend {
     pub backends: HashMap<String, (Vec<BackendServer>, AtomicUsize)>,
 }
 
-impl ServerTracker {
+impl Backend {
     pub fn new() -> Self {
         Self {
             backends: HashMap::new(),
@@ -31,6 +31,7 @@ impl ServerTracker {
         })
     }
 
+    // associate host to backend servers
     pub fn populate(&mut self, frontend_name: String, config: &ProxyConfig) {
         let cfg = config;
         // get backends

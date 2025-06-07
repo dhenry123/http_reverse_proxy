@@ -4,7 +4,7 @@ use std::{collections::HashMap, env, fs::File, path::PathBuf, sync::Arc};
 
 use crate::{
     constants::{DEFAULT_CONFIG_PATH, DEFAULT_TLS_CERT_PATH},
-    forwarders::servers_tracker::ServerTracker,
+    forwarders::backend::Backend,
     structs::{FrontEnd, GenericError, ProxyConfig},
 };
 
@@ -34,7 +34,7 @@ pub struct ConfigManager {
     config_path: PathBuf,
     tls_certs_path: PathBuf,
     config: Option<Arc<ProxyConfig>>,
-    trackers: HashMap<String, Arc<ServerTracker>>,
+    trackers: HashMap<String, Arc<Backend>>,
 }
 
 impl ConfigManager {
@@ -75,7 +75,7 @@ impl ConfigManager {
         let config = self.get_config().await;
         for frontend in config.frontends.clone() {
             let servers_tracker = {
-                let mut tracker = ServerTracker::new();
+                let mut tracker = Backend::new();
                 tracker.populate(frontend.clone().name, &self.get_config().await.clone());
                 Arc::new(tracker)
             };
@@ -83,7 +83,7 @@ impl ConfigManager {
         }
     }
 
-    pub fn get_tracker(&self, frontend_name: String) -> Option<Arc<ServerTracker>> {
+    pub fn get_tracker(&self, frontend_name: String) -> Option<Arc<Backend>> {
         self.trackers.get(frontend_name.as_str()).cloned()
     }
 

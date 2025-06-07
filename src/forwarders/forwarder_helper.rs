@@ -16,7 +16,7 @@ use crate::{
     structs::BackendServer,
 };
 
-use super::servers_tracker::ServerTracker;
+use super::backend::Backend;
 use cookie::Cookie;
 
 pub fn build_upstream_uri(backend_server: BackendServer, is_web_socket: bool) -> String {
@@ -68,7 +68,7 @@ pub fn get_http_client() -> Client<hyper_tls::HttpsConnector<HttpConnector>, bod
  */
 pub fn get_upstream_server(
     original_host: String,
-    servers_tracker: &Arc<ServerTracker>,
+    servers_tracker: &Arc<Backend>,
 ) -> Option<BackendServer> {
     // Which backend ?
     let backend_server = servers_tracker.get_next_backend(&original_host);

@@ -34,8 +34,8 @@ use crate::{
 };
 
 use super::{
+    backend::Backend,
     forwarder_helper::{build_upstream_uri, is_cookie_antibot, is_websocket_request},
-    servers_tracker::ServerTracker,
 };
 
 enum FallBackResponseType {
@@ -79,7 +79,7 @@ pub async fn handle_request(
     req: Request<hyper::body::Incoming>,
     peer_addr: SocketAddr,
     frontend_name: String,
-    servers_tracker: Arc<ServerTracker>,
+    servers_tracker: Arc<Backend>,
     config: Arc<RwLock<ConfigManager>>,
     client: Client<HttpsConnector<HttpConnector>, Incoming>,
     state: Arc<AppState>,
@@ -188,7 +188,13 @@ pub async fn handle_request(
             if initial_error.is_connect() {
                 // upstream serveur failure, server must be desactivated
                 log::error!("upstream_server failure: {:?}", upstream_server);
-                deactivate_server(upstream_server).await;
+                //deactivate_server(upstream_server).await;
+                if upstream_server.is_some() {
+                    state
+                        .runtime_disabled_backend
+                        .disable_backend(upstream_server.unwrap())
+                        .await;
+                };
                 // Return internal response unavailable service 503
                 match get_fallback_response(parts.clone(), FallBackResponseType::ServerUnavailable)
                     .await

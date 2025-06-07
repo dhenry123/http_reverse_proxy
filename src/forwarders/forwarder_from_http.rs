@@ -31,8 +31,6 @@ pub async fn proxy_from_http(
             Ok((tcp, peer_addr)) => {
                 let frontend_name = frontend_name.clone();
                 let state = state.clone();
-                state.metrics.increment_frontend(&frontend_name);
-
                 let svc = {
                     // Clone the values we need to move into the closure
                     let client = client.clone();
@@ -48,6 +46,7 @@ pub async fn proxy_from_http(
 
                     // Create the service_fn
                     service_fn(move |req: Request<hyper::body::Incoming>| {
+                        state.metrics.increment_frontend(&frontend_name);
                         // Call the handler - no async/await here!
                         handle_request(
                             req,
