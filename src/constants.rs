@@ -9,7 +9,7 @@ pub const DEFAULT_TLS_CERT_PATH: &str = "/etc/http_reverse_proxy/certs";
 // Http header
 pub const HTTP_HEADER_X_FORWARDED_FOR: &str = "X-Forwarded-For";
 pub const HTTP_HEADER_X_REAL_IP: &str = "X-Real-IP";
-
+pub const HTTP_HEADER_HOST: &str = "Host";
 // antibot
 pub const ANTIBOT_COOKIE_NAME: &str = "antibot";
 

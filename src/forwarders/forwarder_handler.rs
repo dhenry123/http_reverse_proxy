@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{
-    HeaderMap, Method, Request, Response, Uri,
+    HeaderMap, Request, Response, Uri,
     body::{self, Incoming},
     header::HeaderValue,
 };
@@ -12,17 +12,15 @@ use hyper_util::{
     rt::TokioExecutor,
 };
 use log::debug;
-use serde_json::json;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 use tokio_tungstenite::tungstenite::http;
 
 use crate::{
-    api::api_helper::get_api_server_active_set,
     config_manager::ConfigManager,
     constants::{
-        HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP, INTERNAL_ROUTE_ANTIBOT,
-        INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
+        HTTP_HEADER_HOST, HTTP_HEADER_X_FORWARDED_FOR, HTTP_HEADER_X_REAL_IP,
+        INTERNAL_ROUTE_ANTIBOT, INTERNAL_ROUTE_ERROR_NO_BACKEND_SERVER_AVAILABLE,
     },
     forwarders::{
         forwarder_helper::{get_upstream_server, is_domain_configured_for_antibot},
@@ -30,7 +28,6 @@ use crate::{
     },
     internal_server_free_port,
     state::AppState,
-    structs::BackendServer,
 };
 
 use super::{
@@ -161,7 +158,13 @@ pub async fn handle_request(
     //====> To check round robin load balance
     debug!("upstream_uri: {}", upstream_uri);
 
-    let forwarded_req = get_forwarded_req(parts.clone(), upstream_uri.clone(), peer_addr, body);
+    let forwarded_req = get_forwarded_req(
+        original_host.clone(),
+        parts.clone(),
+        upstream_uri.clone(),
+        peer_addr,
+        body,
+    );
 
     let response = client.request(forwarded_req).await;
 
@@ -188,7 +191,6 @@ pub async fn handle_request(
             if initial_error.is_connect() {
                 // upstream serveur failure, server must be desactivated
                 log::error!("upstream_server failure: {:?}", upstream_server);
-                //deactivate_server(upstream_server).await;
                 if upstream_server.is_some() {
                     state
                         .runtime_disabled_backend
@@ -216,32 +218,6 @@ pub async fn handle_request(
                 Err(initial_error)
             }
         }
-    }
-}
-
-/**
- * deactivate server
- */
-async fn deactivate_server(upstream_server: Option<BackendServer>) {
-    if upstream_server.is_some() {
-        let upstream_uri = get_api_server_active_set();
-        let client: Client<_, Full<Bytes>> = Client::builder(TokioExecutor::new()).build_http();
-        let url = upstream_uri.parse::<Uri>().unwrap();
-        let authority = url.authority().unwrap().clone();
-        let json: String = json!({
-            "name": upstream_server.unwrap().name,
-            "active": false
-        })
-        .to_string();
-
-        let body = Full::new(Bytes::from(json));
-        let req = Request::builder()
-            .uri(url)
-            .header(hyper::header::HOST, authority.as_str())
-            .method(Method::PUT)
-            .body(body)
-            .unwrap();
-        let _ = client.request(req).await;
     }
 }
 
@@ -275,6 +251,7 @@ fn get_internal_error_no_backend_server_available_uri(parts: http::request::Part
  * Build forwarded request with all original headers
  */
 fn get_forwarded_req(
+    original_host: String,
     parts: http::request::Parts,
     upstream_uri: Uri,
     peer_addr: SocketAddr,
@@ -298,6 +275,11 @@ fn get_forwarded_req(
     headers_map.append(
         HTTP_HEADER_X_REAL_IP,
         HeaderValue::from_str(peer_as_str).unwrap(),
+    );
+    // Keep host consistency
+    headers_map.append(
+        HTTP_HEADER_HOST,
+        HeaderValue::from_str(original_host.as_str()).unwrap(),
     );
     let _ = builder.headers_mut().insert(&mut headers_map);
 
