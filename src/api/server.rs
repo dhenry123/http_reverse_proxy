@@ -31,32 +31,20 @@ pub async fn api_server_active_set(
         match request {
             Ok(request) => {
                 // Try to update current config (pool_servers)
-                let proxyconfig = config_manager.get_config().await;
-                let mut updated_server: Option<crate::structs::BackendServer> = None; // Will store the modified server if found
-                let mut new_servers = proxyconfig.pool_servers.clone();
-                for server in &mut new_servers {
-                    if server.name == request.name {
-                        server.active = request.active;
-                        updated_server = Some(server.clone());
-                        break;
-                    }
-                }
+                let updated_server = config_manager
+                    .set_server_active_state(request.name.clone(), request.active.clone())
+                    .await;
                 // set body response
                 body = match updated_server {
-                    Some(server) => {
-                        // Store changes
-                        // Create a mutable copy of the config
-                        let mut new_config = (*proxyconfig).clone();
-                        new_config.pool_servers = new_servers;
-                        config_manager.set_config(new_config.into()).await;
-
+                    Some(_) => {
                         //config.store(Arc::new(new_config.clone()));
                         status_code = StatusCode::OK;
                         JsonResponse::success(format!(
                             "Server {} active state set to {}",
-                            server.name, server.active
+                            request.name.clone(),
+                            request.active.clone()
                         ))
-                        .with_data(json!({ "server": server }))
+                        .with_data(json!({ "server": request.name.clone() }))
                         .build()
                         .to_string()
                     }

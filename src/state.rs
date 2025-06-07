@@ -1,8 +1,10 @@
 use std::{sync::Arc, time::Duration};
 
+use tokio::sync::RwLock;
+
 use crate::{
-    constants::RUNTIMEBACKENDS_INTERVAL_CHECK, forwarders::runtime_backends::RuntimeBackends,
-    statistics::metrics::ProxyMetrics,
+    config_manager::ConfigManager, constants::RUNTIMEBACKENDS_INTERVAL_CHECK,
+    forwarders::runtime_backends::RuntimeBackends, statistics::metrics::ProxyMetrics,
 };
 
 #[derive(Clone)]
@@ -13,12 +15,13 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new() -> Arc<Self> {
+    pub fn new(config_manager_shared: Arc<RwLock<ConfigManager>>) -> Arc<Self> {
         let instance = Arc::new(Self {
             metrics: ProxyMetrics::new(),
-            runtime_disabled_backend: RuntimeBackends::new(Duration::from_secs(
-                RUNTIMEBACKENDS_INTERVAL_CHECK,
-            )),
+            runtime_disabled_backend: RuntimeBackends::new(
+                Duration::from_secs(RUNTIMEBACKENDS_INTERVAL_CHECK),
+                config_manager_shared,
+            ),
         });
         instance
     }

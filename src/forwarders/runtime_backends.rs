@@ -7,18 +7,26 @@ use tokio::sync::RwLock;
 use tokio::time::timeout;
 use tracing::debug;
 
+use crate::config_manager::ConfigManager;
 use crate::structs::BackendServer;
 
 #[derive(Debug)]
 pub struct RuntimeBackends {
     disabled: Arc<RwLock<HashMap<String, BackendServer>>>,
+    config_manager: Arc<RwLock<ConfigManager>>,
 }
 
 impl RuntimeBackends {
-    pub fn new(health_check_interval: Duration) -> Arc<Self> {
+    pub fn new(
+        health_check_interval: Duration,
+        config_manager_shared: Arc<RwLock<ConfigManager>>,
+    ) -> Arc<Self> {
         let disabled = Arc::new(RwLock::new(HashMap::new()));
-        let instance = Arc::new(Self { disabled });
-
+        let config_manager = config_manager_shared.clone();
+        let instance = Arc::new(Self {
+            disabled,
+            config_manager: config_manager.clone(),
+        });
         let instance_clone = instance.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(health_check_interval);
@@ -50,6 +58,11 @@ impl RuntimeBackends {
                 for (name, is_online) in results {
                     if is_online {
                         debug!("Removing server: {} from disabled list", &name);
+                        config_manager
+                            .write()
+                            .await
+                            .set_server_active_state(name.to_string(), true)
+                            .await;
                         write_guard.remove(&name);
                     }
                 }
@@ -78,10 +91,16 @@ impl RuntimeBackends {
     }
 
     pub async fn disable_backend(&self, server: BackendServer) {
+        let server_name = server.name.clone();
         self.disabled
             .write()
             .await
-            .insert(server.name.clone(), server);
+            .insert(server_name.clone(), server);
+        self.config_manager
+            .write()
+            .await
+            .set_server_active_state(server_name, false)
+            .await;
     }
 
     pub async fn is_disabled(&self, backend_name: &str) -> bool {

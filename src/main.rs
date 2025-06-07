@@ -42,8 +42,6 @@ async fn main() -> Result<(), GenericError> {
     let mut config_manager = ConfigManager::new(args);
     config_manager.load().await?;
 
-    let state = AppState::new();
-
     // One TLS Acceptor
     let certs_path = config_manager.get_config_tls_certs_path().await;
     let tls_acceptor = tls_acceptor_init(certs_path)?;
@@ -53,6 +51,8 @@ async fn main() -> Result<(), GenericError> {
 
     // config manager must be mutable in this process
     let config_manager_shared = Arc::new(RwLock::new(config_manager));
+
+    let state = AppState::new(config_manager_shared.clone());
 
     // Starting frontends
     let mut listeners = Vec::new();

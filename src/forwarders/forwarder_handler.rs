@@ -80,7 +80,7 @@ pub async fn handle_request(
     peer_addr: SocketAddr,
     frontend_name: String,
     servers_tracker: Arc<Backend>,
-    config: Arc<RwLock<ConfigManager>>,
+    config_manager: Arc<RwLock<ConfigManager>>,
     client: Client<HttpsConnector<HttpConnector>, Incoming>,
     state: Arc<AppState>,
 ) -> Result<Response<body::Incoming>, hyper_util::client::legacy::Error> {
@@ -104,7 +104,7 @@ pub async fn handle_request(
     let is_antibot_protected = is_domain_configured_for_antibot(
         frontend_name.clone(),
         original_host.clone(),
-        config.clone(),
+        config_manager.clone(),
     )
     .await;
 

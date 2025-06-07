@@ -1,5 +1,5 @@
 use clap::Parser;
-use log::info;
+use log::{error, info};
 use std::{collections::HashMap, env, fs::File, path::PathBuf, sync::Arc};
 
 use crate::{
@@ -97,6 +97,39 @@ impl ConfigManager {
 
     pub async fn get_config(&self) -> Arc<ProxyConfig> {
         self.config.clone().unwrap()
+    }
+
+    pub async fn set_server_active_state(
+        &mut self,
+        server_name: String,
+        active: bool,
+    ) -> Option<bool> {
+        if let Some(config) = &self.config {
+            let mut new_servers = config.pool_servers.clone();
+            let mut updated = false;
+
+            for server in &mut new_servers {
+                if server.name == server_name {
+                    server.active = active;
+                    updated = true;
+                    break; // No need to continue once found
+                }
+            }
+
+            if updated {
+                // Update config
+                let mut config = (**config).clone();
+                config.pool_servers = new_servers;
+                let _ = &self.set_config(config.into()).await;
+                Some(true)
+            } else {
+                info!("Server '{}' not found in configuration", server_name);
+                None
+            }
+        } else {
+            error!("No configuration loaded");
+            None
+        }
     }
 
     pub async fn set_config(&mut self, new_config: Arc<ProxyConfig>) {
