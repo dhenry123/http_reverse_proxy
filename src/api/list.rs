@@ -2,17 +2,17 @@ use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode, header::HeaderValue};
 use serde_json::json;
-use std::{convert::Infallible, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     constants::API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN,
-    structs::{ApiOjectTypes, ProxyConfig},
+    structs::{ApiOjectTypes, GenericError, ProxyConfig},
 };
 
 pub async fn api_list_config_object(
     object_type: ApiOjectTypes,
     config: Arc<ProxyConfig>,
-) -> Result<Response<Full<Bytes>>, Infallible> {
+) -> Result<Response<Full<Bytes>>, GenericError> {
     let body = match object_type {
         ApiOjectTypes::PoolServers => json!({"pool_servers":config.pool_servers}).to_string(),
         ApiOjectTypes::PoolBackends => json!({"pool_backends":config.pool_backends}).to_string(),

@@ -32,7 +32,7 @@ pub const API_LISTENING_PORT: u16 = 27001;
 pub const API_FRONTENDS_LIST: &str = "list/frontends";
 pub const API_BACKENDS_LIST: &str = "list/backends";
 pub const API_SERVERS_LIST: &str = "list/servers";
-
+pub const API_BACKEND: &str = "backend";
 pub const API_SERVERS_ACTIVE: &str = "server/active";
 
 pub const API_METRICS_GET_HITS: &str = "metrics/hits";

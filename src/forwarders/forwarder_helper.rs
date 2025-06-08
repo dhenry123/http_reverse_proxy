@@ -94,7 +94,7 @@ pub async fn is_domain_configured_for_antibot(
         // Get acls
         .into_iter()
         .flat_map(|frontend| frontend.acls)
-        .find(|a| a.host == original_host)
+        .find(|a| a.domain == original_host)
         .into_iter()
         .collect::<Vec<_>>();
 

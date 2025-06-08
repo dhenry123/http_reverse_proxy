@@ -53,7 +53,7 @@ impl Backend {
             .filter_map(|acl| {
                 pool_lookup.get(&acl.backend).map(|servers| {
                     (
-                        acl.host.clone(),
+                        acl.domain.clone(),
                         cfg.pool_servers
                             .iter()
                             // including only active servers

@@ -21,7 +21,7 @@ impl AsRef<str> for ProxyProtocols {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AclConfig {
     pub name: String,
-    pub host: String,
+    pub domain: String,
     pub backend: String,
     pub antibot: Option<bool>,
 }

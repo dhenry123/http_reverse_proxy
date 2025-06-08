@@ -1,4 +1,4 @@
-use std::{convert::Infallible, sync::Arc};
+use std::sync::Arc;
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -10,12 +10,13 @@ use tokio_tungstenite::tungstenite::http;
 use crate::{
     api::{api_helper::parse_query, json_reponse::JsonResponse},
     state::AppState,
+    structs::GenericError,
 };
 
 pub fn api_metric_get_hits(
     state: Arc<AppState>,
     parts: &http::request::Parts,
-) -> Result<Response<Full<Bytes>>, Infallible> {
+) -> Result<Response<Full<Bytes>>, GenericError> {
     let mut response = Response::new(Full::new(Bytes::from("")));
 
     // Parse query parameters

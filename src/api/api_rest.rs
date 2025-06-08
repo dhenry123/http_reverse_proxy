@@ -1,6 +1,9 @@
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
-use hyper::{Method, Request, Response, server::conn::http1, service::service_fn};
+use hyper::{
+    Method, Request, Response, StatusCode, header::HeaderValue, server::conn::http1,
+    service::service_fn,
+};
 use hyper_util::rt::{TokioIo, TokioTimer};
 use log::{debug, info};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
@@ -8,12 +11,13 @@ use tokio::{net::TcpListener, sync::RwLock};
 
 use crate::{
     api::{
-        embed_react::serve_embedded_file, list::api_list_config_object,
+        backend::api_backend_post, embed_react::serve_embedded_file, list::api_list_config_object,
         metrics::api_metric_get_hits, server::api_server_active_set,
     },
     config_manager::ConfigManager,
     constants::{
-        API_BACKENDS_LIST, API_FRONTENDS_LIST, API_METRICS_GET_HITS, API_SERVERS_ACTIVE,
+        API_BACKEND, API_BACKENDS_LIST, API_FRONTENDS_LIST,
+        API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN, API_METRICS_GET_HITS, API_SERVERS_ACTIVE,
         API_SERVERS_LIST, API_VERSION,
     },
     forwarders::internal_http::{InternalServerErrors, internal_error},
@@ -21,12 +25,40 @@ use crate::{
     structs::{ApiOjectTypes, GenericError},
 };
 
+fn preflight() -> Result<Response<Full<Bytes>>, Infallible> {
+    let mut response = Response::new(Full::new(Bytes::from("")));
+
+    response.headers_mut().append(
+        hyper::http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        HeaderValue::from_str(API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+    );
+    response.headers_mut().append(
+        hyper::http::header::ACCESS_CONTROL_ALLOW_METHODS,
+        HeaderValue::from_str("GET, DELETE, POST, PUT, OPTIONS").unwrap(),
+    );
+    response.headers_mut().append(
+        hyper::http::header::ACCESS_CONTROL_ALLOW_HEADERS,
+        HeaderValue::from_str("Content-Type, Authorization").unwrap(),
+    );
+    response.headers_mut().append(
+        hyper::http::header::ACCESS_CONTROL_MAX_AGE,
+        HeaderValue::from_str("3600").unwrap(),
+    );
+    response.headers_mut().append(
+        hyper::http::header::ACCESS_CONTROL_ALLOW_CREDENTIALS,
+        HeaderValue::from_str("true").unwrap(),
+    );
+    // Set http code
+    *response.status_mut() = StatusCode::NO_CONTENT;
+    Ok(response)
+}
+
 async fn backend_service(
     req: Request<hyper::body::Incoming>,
     config_manager: Arc<RwLock<ConfigManager>>,
     peer_addr: SocketAddr,
     state: Arc<AppState>,
-) -> Result<Response<Full<Bytes>>, Infallible> {
+) -> Result<Response<Full<Bytes>>, GenericError> {
     let proxy_config = config_manager.read().await.get_config().await;
     let (parts, body) = req.into_parts();
 
@@ -40,6 +72,8 @@ async fn backend_service(
     debug!("query: {:?}", parts.uri.query());
     debug!("route : {:?}", parts.uri);
     match (parts.clone().method, parts.uri.path()) {
+        // Pre-flight
+        (Method::OPTIONS, _) => Ok(preflight()?),
         //Enbed react app
         (Method::GET, path) if !path.starts_with(format!("/{}", API_VERSION).as_str()) => {
             Ok(serve_embedded_file(path).await?)
@@ -63,7 +97,15 @@ async fn backend_service(
         {
             Ok(api_list_config_object(ApiOjectTypes::PoolServers, proxy_config).await?)
         }
-        // ---> set server active attribute
+        // backends
+        (Method::POST, path)
+            if path.starts_with(format!("/{}/{}", API_VERSION, API_BACKEND,).as_str()) =>
+        {
+            Ok(api_backend_post(config_manager.clone(), body_bytes).await?)
+        }
+
+        // servers
+        // ---> manage the attribute: active (live)
         (Method::PUT, path)
             if path.starts_with(format!("/{}/{}", API_VERSION, API_SERVERS_ACTIVE,).as_str()) =>
         {

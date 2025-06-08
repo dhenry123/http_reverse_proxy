@@ -19,11 +19,65 @@ tags:
       description: Find out more
       url: https://github.com/dhenry123/http_reverse_proxy
   - name: server
-    description: backer server management
+    description: backend servers management
     externalDocs:
       description: Find out more
       url: https://github.com/dhenry123/http_reverse_proxy
+  - name: backend
+    description: backend management
+    externalDocs:
+      description: Find out more
+      url: https://github.com/dhenry123/http_reverse_proxy
+
 paths:
+  /backend/:
+    post:
+      tags:
+        - backend
+      summary: Create/Update backend
+      description: Create or update backend, if backend with same name already exists, it will be replaced, same for servers
+      operationId: createBackend
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/body_backend_post"
+            example: '{
+              "name": "namespace-container-internal-port",
+              "domain": "test.mydomain",
+              "frontends": [
+              "internalnetwork-https",
+              "localnetwork-https",
+              "internetnetwork-http"
+              ],
+              "servers": [
+              {
+              "name": "namespace-container-internal-port-k8snode0",
+              "host": "10.28.1.1",
+              "port": 52400,
+              "protocol": "http",
+              "tls": false,
+              "active": true
+              },
+              {
+              "name": "namespace-container-internal-port-k8snode1",
+              "host": "10.28.1.2",
+              "port": 52401,
+              "protocol": "http",
+              "tls": false,
+              "active": true
+              }
+              ]
+              }'
+        required: true
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/responseServerActive"
+
   /list/frontends:
     get:
       tags:
@@ -121,6 +175,24 @@ paths:
 
 components:
   schemas:
+    body_backend_post:
+      type: object
+      properties:
+        name:
+          type: string
+          description: "Backend name"
+        domain:
+          type: string
+          description: Domain name, all traffic for this domain will be routed to the servers of this backend.
+        servers:
+          type: array
+          items:
+            $ref: "#/components/schemas/server"
+        frontends:
+          type: array
+          items:
+            type: string
+            description: "Frontend name"
     body_server_active:
       type: object
       properties:

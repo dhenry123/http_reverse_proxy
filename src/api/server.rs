@@ -1,4 +1,4 @@
-use std::{convert::Infallible, sync::Arc};
+use std::sync::Arc;
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -6,7 +6,10 @@ use hyper::{Response, StatusCode, header::HeaderValue};
 use serde_json::json;
 use tokio::sync::RwLock;
 
-use crate::{config_manager::ConfigManager, structs::GenericError};
+use crate::{
+    config_manager::ConfigManager, constants::API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN,
+    structs::GenericError,
+};
 
 use super::{
     body_json_structs::BodyServerActive, json_body::extract_json_body, json_reponse::JsonResponse,
@@ -15,7 +18,7 @@ use super::{
 pub async fn api_server_active_set(
     config_manager: Arc<RwLock<ConfigManager>>,
     body_bytes: Option<Bytes>,
-) -> Result<Response<Full<Bytes>>, Infallible> {
+) -> Result<Response<Full<Bytes>>, GenericError> {
     let mut response = Response::new(Full::new(Bytes::from("")));
 
     let mut body: String = "".to_string();
@@ -66,5 +69,10 @@ pub async fn api_server_active_set(
         hyper::http::header::CONTENT_TYPE,
         HeaderValue::from_str("application/json").unwrap(),
     );
+    response.headers_mut().append(
+        hyper::http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        HeaderValue::from_str(API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(),
+    );
+
     Ok(response)
 }
