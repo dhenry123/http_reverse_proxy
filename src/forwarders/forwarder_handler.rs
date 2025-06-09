@@ -105,7 +105,7 @@ pub async fn handle_request(
     )
     .await;
 
-    // upstream uri - server selected (will be desactived if server not available)
+    // upstream uri - server selected (will be disabled if server not available)
     let upstream_server = get_upstream_server(original_host.clone(), &servers_tracker);
     let mut upstream_uri = match upstream_server.clone() {
         Some(server) => build_upstream_uri(server, false),

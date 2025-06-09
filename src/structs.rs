@@ -33,7 +33,7 @@ pub struct FrontEnd {
     pub port: u16,
     pub addr: String,
     pub tls: bool,
-    pub active: bool,
+    pub enabled: bool,
     pub acls: Vec<AclConfig>,
 }
 
@@ -52,7 +52,7 @@ pub struct BackendServer {
     pub port: u16,
     pub protocol: ProxyProtocols,
     pub tls: bool, // final endpoing is ssl ???
-    pub active: bool,
+    pub enabled: bool,
     pub path: Option<String>,
 }
 

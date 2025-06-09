@@ -8,6 +8,7 @@ use tokio_rustls::TlsAcceptor;
 
 use crate::{
     config_manager::ConfigManager,
+    constants::HTTP1_HEADER_READ_TIMEOUT,
     forwarders::{forwarder_handler::handle_request, forwarder_helper::get_http_client},
     state::AppState,
     structs::GenericError,
@@ -57,6 +58,8 @@ pub async fn proxy_from_https(
                     let state = state.clone();
                     // Create the service_fn
                     service_fn(move |req: Request<hyper::body::Incoming>| {
+                        // frontend metrics
+                        state.metrics.increment_frontend(&frontend_name);
                         // Call the handler - no async/await here!
                         handle_request(
                             req,
@@ -74,8 +77,6 @@ pub async fn proxy_from_https(
                 let frontend_name = frontend_name.clone();
                 match tls_acceptor.accept(tcp).await {
                     Ok(tls_stream) => {
-                        let state = state.clone();
-                        state.metrics.increment_frontend(&frontend_name);
                         // Handle the connection
                         let io = TokioIo::new(tls_stream);
                         let svc = svc.clone();
@@ -83,7 +84,9 @@ pub async fn proxy_from_https(
                         tokio::task::spawn(async move {
                             if let Err(err) = http1::Builder::new()
                                 .timer(TokioTimer::new())
-                                .header_read_timeout(Some(Duration::from_secs(5)))
+                                .header_read_timeout(Some(Duration::from_secs(
+                                    HTTP1_HEADER_READ_TIMEOUT,
+                                )))
                                 .auto_date_header(false)
                                 .serve_connection(io, svc)
                                 .with_upgrades()

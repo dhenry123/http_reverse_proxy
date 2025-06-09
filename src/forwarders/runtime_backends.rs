@@ -61,7 +61,7 @@ impl RuntimeBackends {
                         config_manager
                             .write()
                             .await
-                            .set_server_active_state(name.to_string(), true)
+                            .set_server_enabled_state(name.to_string(), true)
                             .await;
                         write_guard.remove(&name);
                     }
@@ -99,7 +99,7 @@ impl RuntimeBackends {
         self.config_manager
             .write()
             .await
-            .set_server_active_state(server_name, false)
+            .set_server_enabled_state(server_name, false)
             .await;
     }
 

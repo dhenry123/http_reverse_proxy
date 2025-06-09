@@ -12,12 +12,12 @@ use tokio::{net::TcpListener, sync::RwLock};
 use crate::{
     api::{
         backend::api_backend_post, embed_react::serve_embedded_file, list::api_list_config_object,
-        metrics::api_metric_get_hits, server::api_server_active_set,
+        metrics::api_metric_get_hits, server::api_server_enabled_set,
     },
     config_manager::ConfigManager,
     constants::{
         API_BACKEND, API_BACKENDS_LIST, API_FRONTENDS_LIST,
-        API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN, API_METRICS_GET_HITS, API_SERVERS_ACTIVE,
+        API_HEADER_VALUE_ACCESS_CONTROL_ALLOW_ORIGIN, API_METRICS_GET_HITS, API_SERVER_ENABLED,
         API_SERVERS_LIST, API_VERSION,
     },
     forwarders::internal_http::{InternalServerErrors, internal_error},
@@ -103,13 +103,17 @@ async fn backend_service(
         {
             Ok(api_backend_post(config_manager.clone(), body_bytes).await?)
         }
-
-        // servers
-        // ---> manage the attribute: active (live)
         (Method::PUT, path)
-            if path.starts_with(format!("/{}/{}", API_VERSION, API_SERVERS_ACTIVE,).as_str()) =>
+            if path.starts_with(format!("/{}/{}", API_VERSION, API_BACKEND,).as_str()) =>
         {
-            Ok(api_server_active_set(config_manager.clone(), body_bytes).await?)
+            Ok(api_backend_post(config_manager.clone(), body_bytes).await?)
+        }
+        // servers
+        // ---> manage the attribute: enabled (live)
+        (Method::PUT, path)
+            if path.starts_with(format!("/{}/{}", API_VERSION, API_SERVER_ENABLED,).as_str()) =>
+        {
+            Ok(api_server_enabled_set(config_manager.clone(), body_bytes).await?)
         }
         // metrics
         // ----> hits

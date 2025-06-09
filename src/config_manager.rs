@@ -123,7 +123,7 @@ impl ConfigManager {
                     .find(|x| x.domain == new_backend.domain);
 
                 let new_acl = AclConfig {
-                    antibot: Some(false),
+                    antibot: Some(new_backend.antibot.clone()),
                     name: new_backend.name.clone(),
                     backend: new_backend.name.clone(),
                     domain: new_backend.domain.clone(),
@@ -205,10 +205,10 @@ impl ConfigManager {
         Ok(changes)
     }
 
-    pub async fn set_server_active_state(
+    pub async fn set_server_enabled_state(
         &mut self,
         server_name: String,
-        active: bool,
+        enabled: bool,
     ) -> Option<bool> {
         if let Some(config) = &self.config {
             let mut new_servers = config.pool_servers.clone();
@@ -216,7 +216,7 @@ impl ConfigManager {
 
             for server in &mut new_servers {
                 if server.name == server_name {
-                    server.active = active;
+                    server.enabled = enabled;
                     updated = true;
                     break; // No need to continue once found
                 }

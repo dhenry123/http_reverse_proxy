@@ -1,6 +1,8 @@
 // Backend
 pub const POOL_MAX_IDLE_PER_HOST: usize = 50;
 pub const POOL_IDLE_TIMEOUT: u64 = 60;
+// This option has impact on the keepalived connection, improve the load balacing but could impact performances
+pub const HTTP1_HEADER_READ_TIMEOUT: u64 = 2;
 
 // Config default
 pub const DEFAULT_CONFIG_PATH: &str = "/etc/http_reverse_proxy/config.yaml";
@@ -33,7 +35,7 @@ pub const API_FRONTENDS_LIST: &str = "list/frontends";
 pub const API_BACKENDS_LIST: &str = "list/backends";
 pub const API_SERVERS_LIST: &str = "list/servers";
 pub const API_BACKEND: &str = "backend";
-pub const API_SERVERS_ACTIVE: &str = "server/active";
+pub const API_SERVER_ENABLED: &str = "server/enabled";
 
 pub const API_METRICS_GET_HITS: &str = "metrics/hits";
 

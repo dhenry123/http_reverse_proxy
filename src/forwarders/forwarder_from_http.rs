@@ -2,11 +2,12 @@ use hyper::{Request, server::conn::http1, service::service_fn};
 
 use hyper_util::rt::{TokioIo, TokioTimer};
 use log::info;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::RwLock};
 
 use crate::{
     config_manager::ConfigManager,
+    constants::HTTP1_HEADER_READ_TIMEOUT,
     forwarders::{forwarder_handler::handle_request, forwarder_helper::get_http_client},
     state::AppState,
     structs::GenericError,
@@ -66,6 +67,7 @@ pub async fn proxy_from_http(
                     let frontend_name = frontend_name.clone();
                     if let Err(err) = http1::Builder::new()
                         .timer(TokioTimer::new())
+                        .header_read_timeout(Some(Duration::from_secs(HTTP1_HEADER_READ_TIMEOUT)))
                         .preserve_header_case(true)
                         .writev(true)
                         .serve_connection(io, svc)

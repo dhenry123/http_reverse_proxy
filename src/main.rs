@@ -58,7 +58,7 @@ async fn main() -> Result<(), GenericError> {
     let mut listeners = Vec::new();
     for frontend in config.frontends.clone() {
         let shared_manager = config_manager_shared.clone();
-        if !frontend.active {
+        if !frontend.enabled {
             continue;
         }
         let ipaddr = parse_bind_address(&frontend.addr).unwrap();

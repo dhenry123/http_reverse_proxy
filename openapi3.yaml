@@ -30,6 +30,25 @@ tags:
       url: https://github.com/dhenry123/http_reverse_proxy
 
 paths:
+  /backend/antibot:
+    put:
+      tags:
+        - backend
+      summary: Activate or desactivate antibot on backend
+      operationId: activateDesactivateAntibotBackend
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/body_backend_antibot_put"
+      responses:
+        "200":
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/responseServerActive"
+
   /backend/:
     post:
       tags:
@@ -45,6 +64,7 @@ paths:
             example: '{
               "name": "namespace-container-internal-port",
               "domain": "test.mydomain",
+              "antibot": true,
               "frontends": [
               "internalnetwork-https",
               "localnetwork-https",
@@ -57,7 +77,7 @@ paths:
               "port": 52400,
               "protocol": "http",
               "tls": false,
-              "active": true
+              "enabled": true
               },
               {
               "name": "namespace-container-internal-port-k8snode1",
@@ -65,7 +85,7 @@ paths:
               "port": 52401,
               "protocol": "http",
               "tls": false,
-              "active": true
+              "enabled": true
               }
               ]
               }'
@@ -175,6 +195,19 @@ paths:
 
 components:
   schemas:
+    body_backend_antibot_put:
+      type: object
+      properties:
+        frontend_name:
+          type: string
+          description: "Frontend name"
+        backend_name:
+          type: string
+          description: "Backend name"
+        enabled:
+          type: boolean
+          description: "Enabled: true, Disabled: false"
+
     body_backend_post:
       type: object
       properties:
@@ -184,6 +217,8 @@ components:
         domain:
           type: string
           description: Domain name, all traffic for this domain will be routed to the servers of this backend.
+        antibot:
+          type: boolean
         servers:
           type: array
           items:

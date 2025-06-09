@@ -12,10 +12,10 @@ use crate::{
 };
 
 use super::{
-    body_json_structs::BodyServerActive, json_body::extract_json_body, json_reponse::JsonResponse,
+    body_json_structs::BodyServerEnabled, json_body::extract_json_body, json_reponse::JsonResponse,
 };
 
-pub async fn api_server_active_set(
+pub async fn api_server_enabled_set(
     config_manager: Arc<RwLock<ConfigManager>>,
     body_bytes: Option<Bytes>,
 ) -> Result<Response<Full<Bytes>>, GenericError> {
@@ -29,13 +29,13 @@ pub async fn api_server_active_set(
     // payload is provided
     if body_bytes.is_some() {
         //Try to get payload
-        let request: Result<BodyServerActive, GenericError> =
+        let request: Result<BodyServerEnabled, GenericError> =
             extract_json_body(body_bytes.unwrap()).await;
         match request {
             Ok(request) => {
                 // Try to update current config (pool_servers)
                 let updated_server = config_manager
-                    .set_server_active_state(request.name.clone(), request.active.clone())
+                    .set_server_enabled_state(request.name.clone(), request.enabled.clone())
                     .await;
                 // set body response
                 body = match updated_server {
@@ -43,9 +43,9 @@ pub async fn api_server_active_set(
                         //config.store(Arc::new(new_config.clone()));
                         status_code = StatusCode::OK;
                         JsonResponse::success(format!(
-                            "Server {} active state set to {}",
+                            "Server {} enabled state set to {}",
                             request.name.clone(),
-                            request.active.clone()
+                            request.enabled.clone()
                         ))
                         .with_data(json!({ "server": request.name.clone() }))
                         .build()

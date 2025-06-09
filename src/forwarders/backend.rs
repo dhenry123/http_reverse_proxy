@@ -56,8 +56,8 @@ impl Backend {
                         acl.domain.clone(),
                         cfg.pool_servers
                             .iter()
-                            // including only active servers
-                            .filter(|server| servers.contains(&server.name) && server.active)
+                            // including only enabled servers
+                            .filter(|server| servers.contains(&server.name) && server.enabled)
                             .cloned()
                             .collect::<Vec<_>>(),
                     )
